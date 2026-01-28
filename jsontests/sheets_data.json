@@ -18,34 +18,7 @@
           "{price} р.",
           "{date} дн."
         ],
-        "variables_description": [],
-        "meta_status": {
-          "h1": true,
-          "title": true,
-          "description": false
-        }
-      },
-      "https://vorota-one.ru/catalog/vorota/garazhnye/": {
-        "queries": [
-          "гаражные ворота",
-          "купить гаражные ворота",
-          "гаражные ворота цена",
-          "ворота для гаража",
-          "купить ворота в гараж"
-        ],
-        "company_name": "Ворота нам",
-        "variables_h1": [
-          "{price} р."
-        ],
-        "variables_title": [
-          "{price} р."
-        ],
-        "variables_description": [],
-        "meta_status": {
-          "h1": false,
-          "title": false,
-          "description": false
-        }
+        "variables_description": []
       }
     }
   }

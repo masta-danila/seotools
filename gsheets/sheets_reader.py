@@ -79,8 +79,8 @@ def get_urls_with_empty_meta(worksheet) -> Dict[str, Dict[str, bool]]:
         print(f"Не найдена обязательная колонка: {e}")
         return []
     
-    # Собираем URL с незаполненными метатегами и информацией о заполненности
-    urls_meta_status = {}
+    # Собираем URL с незаполненными метатегами
+    urls_with_empty_meta = []
     
     for row in all_values[1:]:  # Пропускаем заголовок
         if len(row) <= max(url_idx, h1_idx, title_idx, desc_idx):
@@ -93,25 +93,21 @@ def get_urls_with_empty_meta(worksheet) -> Dict[str, Dict[str, bool]]:
         
         # Если хотя бы одно поле пустое и есть URL
         if url and (not h1 or not title or not description):
-            urls_meta_status[url] = {
-                "h1": bool(h1),
-                "title": bool(title),
-                "description": bool(description)
-            }
+            urls_with_empty_meta.append(url)
     
-    return urls_meta_status
+    return urls_with_empty_meta
 
 
-def get_input_data_for_urls(worksheet, urls_meta_status: Dict[str, Dict[str, bool]]) -> Dict[str, Dict]:
+def get_input_data_for_urls(worksheet, urls_list: List[str]) -> Dict[str, Dict]:
     """
     Получает вводные данные для URL с листа "Data"
     
     Args:
         worksheet: Лист "Data"
-        urls_meta_status: Словарь {url: {"h1": bool, "title": bool, "description": bool}}
+        urls_list: Список URL для обработки
     
     Returns:
-        Dict[str, Dict]: Словарь {url: {данные + статус метатегов}}
+        Dict[str, Dict]: Словарь {url: {данные}}
     """
     # Получаем все данные листа
     all_values = worksheet.get_all_values()
@@ -143,8 +139,8 @@ def get_input_data_for_urls(worksheet, urls_meta_status: Dict[str, Dict[str, boo
         
         url = row[url_idx].strip()
         
-        # Если этот URL в словаре нужных
-        if url in urls_meta_status:
+        # Если этот URL в списке нужных
+        if url in urls_list:
             # Инициализируем словарь для URL если его еще нет
             if url not in result:
                 result[url] = {
@@ -201,13 +197,6 @@ def get_input_data_for_urls(worksheet, urls_meta_status: Dict[str, Dict[str, boo
         company_names = list(result[url]["company_name"])
         # Если несколько названий компании, берем первое непустое
         result[url]["company_name"] = company_names[0] if company_names else ""
-        
-        # Добавляем информацию о статусе метатегов
-        result[url]["meta_status"] = urls_meta_status.get(url, {
-            "h1": False,
-            "title": False,
-            "description": False
-        })
     
     return result
 
@@ -243,11 +232,11 @@ def process_all_spreadsheets() -> Dict:
                 print(f"  ✗ Лист 'Meta' не найден")
                 continue
             
-            # Находим URL с незаполненными метатегами и их статус
-            urls_meta_status = get_urls_with_empty_meta(meta_sheet)
-            print(f"  Найдено URL с незаполненными метатегами: {len(urls_meta_status)}")
+            # Находим URL с незаполненными метатегами
+            urls_list = get_urls_with_empty_meta(meta_sheet)
+            print(f"  Найдено URL с незаполненными метатегами: {len(urls_list)}")
             
-            if not urls_meta_status:
+            if not urls_list:
                 print(f"  ✓ Все метатеги заполнены")
                 continue
             
@@ -259,7 +248,7 @@ def process_all_spreadsheets() -> Dict:
                 continue
             
             # Получаем вводные данные для URL
-            input_data = get_input_data_for_urls(input_sheet, urls_meta_status)
+            input_data = get_input_data_for_urls(input_sheet, urls_list)
             print(f"  Получено данных для URL: {len(input_data)}")
             
             # Сохраняем данные для этой таблицы
@@ -337,7 +326,6 @@ if __name__ == "__main__":
                 print(f"Переменные h1: {first_data.get('variables_h1', [])}")
                 print(f"Переменные title: {first_data.get('variables_title', [])}")
                 print(f"Переменные description: {first_data.get('variables_description', [])}")
-                print(f"Статус метатегов: {first_data.get('meta_status', {})}")
         
     except Exception as e:
         print(f"\nОшибка: {e}")

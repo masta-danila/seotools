@@ -145,26 +145,30 @@ def update_spreadsheet_metatags(
                 })
                 continue
             
-            # Проверяем, какие поля нужно заполнить
-            meta_status = url_info.get("meta_status", {})
+            # Читаем текущие значения из таблицы
+            current_h1 = worksheet.cell(row_num, h1_col_idx).value
+            current_title = worksheet.cell(row_num, title_col_idx).value
+            current_description = worksheet.cell(row_num, description_col_idx).value
+            
+            # Подготавливаем обновления только для пустых полей
             updates = []
             
             # H1 - заполняем если пусто
-            if not meta_status.get("h1", False) and generated.get("h1"):
+            if not current_h1 and generated.get("h1"):
                 updates.append({
                     "range": f"{chr(64 + h1_col_idx)}{row_num}",
                     "value": generated["h1"]
                 })
             
             # Title - заполняем если пусто
-            if not meta_status.get("title", False) and generated.get("title"):
+            if not current_title and generated.get("title"):
                 updates.append({
                     "range": f"{chr(64 + title_col_idx)}{row_num}",
                     "value": generated["title"]
                 })
             
             # Description - заполняем если пусто
-            if not meta_status.get("description", False) and generated.get("description"):
+            if not current_description and generated.get("description"):
                 updates.append({
                     "range": f"{chr(64 + description_col_idx)}{row_num}",
                     "value": generated["description"]
