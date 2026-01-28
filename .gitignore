@@ -24,5 +24,9 @@ gsheets/credentials.json
 .DS_Store
 Thumbs.db
 
+# Logs
+logs/
+*.log
+
 # Test results (optional - можно коммитить для примеров)
 # jsontests/*.json

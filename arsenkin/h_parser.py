@@ -38,6 +38,7 @@ def get_headers() -> Dict[str, str]:
 async def create_task_by_urls(
     urls: List[str],
     foreign: bool = False,
+    max_retries: int = 3,
 ) -> Optional[int]:
     """
     Создаёт задачу на парсинг мета-тегов по списку URL (инструмент check-h).
@@ -45,6 +46,7 @@ async def create_task_by_urls(
     Args:
         urls: Список URL для парсинга
         foreign: Флаг для иностранных сайтов (по умолчанию False)
+        max_retries: Максимальное количество повторных попыток при 429 ошибке
     
     Returns:
         ID задачи или None в случае ошибки
@@ -58,22 +60,48 @@ async def create_task_by_urls(
             "queries": urls,
         },
     }
+    
+    print(f"[DEBUG] create_task_by_urls: отправка {len(urls)} URL")
+    print(f"[DEBUG] create_task_by_urls: первые 2 URL: {urls[:2]}")
 
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(API_SET_URL, headers=get_headers(), json=payload)
-        response.raise_for_status()
+    for attempt in range(max_retries):
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.post(API_SET_URL, headers=get_headers(), json=payload)
+            
+            print(f"[DEBUG] create_task_by_urls: status_code={response.status_code}")
+            
+            # Обработка 429 (Too Many Requests)
+            if response.status_code == 429:
+                wait_time = 60 * (attempt + 1)  # 60, 120, 180 секунд
+                print(f"[WARN] Rate limit (429). Попытка {attempt + 1}/{max_retries}. Ожидание {wait_time} сек...")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(wait_time)
+                    continue
+                else:
+                    print(f"[ERROR] Превышено максимальное количество попыток при rate limit")
+                    return None
+            
+            response.raise_for_status()
 
-        data = response.json()
-        task_id = data.get("task_id")
-        if task_id:
-            return task_id
-        return None
+            data = response.json()
+            print(f"[DEBUG] create_task_by_urls: response data={data}")
+            task_id = data.get("task_id")
+            if task_id:
+                print(f"[DEBUG] create_task_by_urls: успешно создана задача task_id={task_id}")
+                return task_id
+            else:
+                print(f"[ERROR] create_task_by_urls: в ответе нет task_id")
+                return None
 
-    except httpx.RequestError:
-        return None
-    except Exception:
-        return None
+        except httpx.RequestError as e:
+            print(f"[ERROR] create_task_by_urls: RequestError - {e}")
+            return None
+        except Exception as e:
+            print(f"[ERROR] create_task_by_urls: Exception - {type(e).__name__}: {e}")
+            return None
+    
+    return None
 
 
 async def check_task_status(task_id: int) -> Optional[str]:
@@ -217,6 +245,7 @@ async def get_h_tags_by_urls(
     )
 
     if not task_id:
+        print(f"[ERROR] Не удалось создать задачу в Arsenkin API")
         return {}
 
     # Интервал опроса зависит от числа URL'ов, чтобы реже дергать API
@@ -228,10 +257,13 @@ async def get_h_tags_by_urls(
     )
     
     if not result_data:
+        print(f"[ERROR] Не получены данные от Arsenkin API (task_id: {task_id})")
         return {}
     
     # Парсируем результат в словарь {url: {title, description}}
-    return parse_h_results(result_data)
+    parsed = parse_h_results(result_data)
+    print(f"[DEBUG] parse_h_results вернул {len(parsed)} записей")
+    return parsed
 
 
 def save_results_to_json(results: Dict, filename: str = "jsontests/arsenkin_h_results.json") -> None:
@@ -288,6 +320,7 @@ async def process_batch_results_with_metatags(
         return batch_data
     
     print(f"[PROCESS] Получение метатегов для {len(all_urls)} URL...")
+    print(f"[DEBUG] Первые 3 URL: {all_urls[:3]}")
     
     # Получаем метатеги для всех URL
     metatags = await get_h_tags_by_urls(
@@ -298,6 +331,11 @@ async def process_batch_results_with_metatags(
     )
     
     print(f"[OK] Получено метатегов: {len(metatags)}")
+    if metatags:
+        first_url = list(metatags.keys())[0]
+        print(f"[DEBUG] Пример метатегов для {first_url}: {metatags[first_url]}")
+    else:
+        print(f"[WARN] Словарь metatags пустой!")
     
     # Обновляем batch_data: заменяем filtered_urls на список словарей с метатегами
     for spreadsheet_id, spreadsheet_info in batch_data.items():
@@ -325,7 +363,7 @@ if __name__ == "__main__":
     Тестовый запуск
     """
     # Загружаем данные
-    with open("jsontests/search_batch_results.json", 'r', encoding='utf-8') as f:
+    with open("jsontests/step2_search_results.json", 'r', encoding='utf-8') as f:
         batch_data = json.load(f)
     
     # Обрабатываем

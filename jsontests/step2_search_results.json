@@ -19,28 +19,26 @@
           "{date} дн."
         ],
         "variables_description": [],
-        "meta_status": {
-          "h1": true,
-          "title": true,
-          "description": false
-        },
         "filtered_urls": [
+          "https://kupi-vorota.ru/",
+          "https://automaticheskie-vorota.ru/",
+          "https://vorota-vam.ru/",
           "https://vorota-mp.ru/raspashnyie-vorota/",
           "https://www.region-vorota.ru/catalog/avtomaticheskie_vorota/",
+          "https://vorota-group.ru/raspashnye-vorota/s-kalitkoi/",
+          "https://avtoproezd.ru/vorota/",
+          "https://levin-group.ru/katalog/vorota/dlya-dachi/",
+          "https://www.sart-vorota.ru/",
+          "https://gruppa-masterov.ru/vorota/otkatnye/avtomaticheskie/",
+          "https://vorota-group.ru/vorota-otkatnye/avtomaticheskie/",
+          "https://www.wildberries.ru/catalog/tags/vorota-s-kalitkoi-dlja-doma",
+          "https://vorota750.ru/",
+          "https://good-zabor.ru/catalog/vorota-dlya-chastnogo-doma.html",
+          "https://gruppa-masterov.ru/vorota/otkatnye/",
+          "https://vorota750.ru/katalog/vorota/otkatnye/s-avtomatikoj",
           "https://levin-group.ru/katalog/vorota/",
           "https://automaticheskie-vorota.ru/raspashnye-vorota",
-          "https://automaticheskie-vorota.ru/",
-          "https://good-zabor.ru/catalog/vorota-dlya-chastnogo-doma.html",
-          "https://vorota-group.ru/vorota-otkatnye/avtomaticheskie/",
-          "https://avtoproezd.ru/vorota/",
-          "https://vorota-vam.ru/",
-          "https://gruppa-masterov.ru/vorota/otkatnye/avtomaticheskie/",
-          "https://www.wildberries.ru/catalog/tags/vorota-s-kalitkoi-dlja-doma",
-          "https://kupi-vorota.ru/",
-          "https://vorota.moscow/",
-          "https://vorota750.ru/katalog/vorota/otkatnye",
-          "https://vorota750.ru/katalog/vorota/otkatnye/s-avtomatikoj",
-          "https://vorota-group.ru/raspashnye-vorota/"
+          "https://vorota750.ru/katalog/vorota/otkatnye"
         ]
       },
       "https://vorota-one.ru/catalog/vorota/garazhnye/": {
@@ -59,20 +57,20 @@
           "{price} р."
         ],
         "variables_description": [],
-        "meta_status": {
-          "h1": false,
-          "title": false,
-          "description": false
-        },
         "filtered_urls": [
-          "https://vorota-vsem.ru/catalog/garazhnye-vorota/sekcionnye/",
-          "https://levin-group.ru/katalog/vorota/sekcyonnye/",
-          "https://vorota-doorhan.ru/garazhnye-vorota/",
-          "https://vorota-group.ru/garazhnye-vorota/",
-          "https://lider-doors.ru/metallicheskie-vorota/garazhnye-metallicheskie-vorota/",
           "https://automaticheskie-vorota.ru/garaghnie-vorota",
           "https://www.region-vorota.ru/catalog/avtomaticheskie_vorota/garazhnye/sektsionnye/",
-          "https://levin-group.ru/katalog/vorota/dlia-garazha/"
+          "https://levin-group.ru/katalog/vorota/dlia-garazha/",
+          "https://alutech.ru/vorota/garazhnye/sekcionnye/",
+          "https://www.region-vorota.ru/catalog/avtomaticheskie_vorota/garazhnye/",
+          "https://vorota-group.ru/garazhnye-vorota/",
+          "https://levin-group.ru/katalog/vorota/sekcyonnye/",
+          "https://vorota-top.ru/garazhnye-vorota",
+          "https://lider-doors.ru/metallicheskie-vorota/garazhnye-metallicheskie-vorota/",
+          "https://vorota-vam.ru/garazhnyie-vorota/",
+          "https://vorota-vam.ru/garazhnyie-vorota/raspashnye/",
+          "https://metallprotect.ru/garazhnye-vorota",
+          "https://vorota-doorhan.ru/garazhnye-vorota/"
         ]
       }
     }
