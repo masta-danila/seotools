@@ -1,0 +1,109 @@
+{
+  "gpt-4o": {
+    "1M input tokens": 2.5,
+    "1M cached** input tokens": 1.25,
+    "1M output tokens": 10
+  },
+  "gpt-4.1-nano": {
+    "1M input tokens": 0.1,
+    "1M cached** input tokens": 0.025,
+    "1M output tokens": 0.4
+  },
+  "gpt-4.1": {
+    "1M input tokens": 2,
+    "1M cached** input tokens": 0.5,
+    "1M output tokens": 8
+  },
+  "gpt-4.1-mini": {
+    "1M input tokens": 0.4,
+    "1M cached** input tokens": 0.1, 
+    "1M output tokens": 1.6
+  },
+    "gpt-4o-mini": {
+    "1M input tokens": 0.15,
+    "1M cached** input tokens": 0.075,
+    "1M output tokens": 0.6
+  },
+  "claude-sonnet-4-5-20250929": {
+    "input_tokens": 3,
+    "output_tokens": 15
+  },
+  "claude-haiku-4-5-20251001": {
+    "input_tokens": 1,
+    "output_tokens": 5
+  },
+    "deepseek-chat": {
+    "1M TOKENS INPUT (CACHE HIT)": 0.07,
+    "1M TOKENS INPUT (CACHE MISS)": 0.27,
+    "1M TOKENS OUTPUT": 1.1,
+    "DISCOUNT TIME": "UTC 16:30-00:30",
+      "DISCOUNT": 0.5
+    },
+    "deepseek-reasoner": {
+    "1M TOKENS INPUT (CACHE HIT)": 0.14,
+    "1M TOKENS INPUT (CACHE MISS)": 0.55,
+    "1M TOKENS OUTPUT": 2.19,
+    "DISCOUNT TIME": "UTC 16:30-00:30",
+      "DISCOUNT": 0.75
+  },
+  "gpt-5.1": {
+    "1M input tokens": 1.25,
+    "1M cached** input tokens": 0.125,
+    "1M output tokens": 10
+  },  
+  "gpt-5.2": {
+    "1M input tokens": 1.75,
+    "1M cached** input tokens": 0.175,
+    "1M output tokens": 14
+  },
+  "gpt-5-mini": {
+    "1M input tokens": 0.25,
+    "1M cached** input tokens": 0.025,
+    "1M output tokens": 2
+  },
+  "gpt-5-nano": {
+    "1M input tokens": 0.05,
+    "1M cached** input tokens": 0.005,  
+    "1M output tokens": 0.4
+  },
+  "gemini-3-pro-preview": {
+    "1M input tokens": 2,
+    "1M cached** input tokens": 2,
+    "1M output tokens": 12
+  },
+  "gemini-2.5-flash": {
+    "1M input tokens": 0.3,
+    "1M cached** input tokens": 0.3,
+    "1M output tokens": 2.5
+  },
+  "gemini-2.5-flash-lite": {
+    "1M input tokens": 0.1,
+    "1M cached** input tokens": 0.1,
+    "1M output tokens": 0.4
+  },
+  "gemini-2.5-pro": {
+    "1M input tokens": 1.25,
+    "1M cached** input tokens": 1.24,
+    "1M output tokens": 10.0
+  },
+  "grok-4-0709": {
+    "1M input tokens": 3,
+    "1M cached** input tokens": 0.75,
+    "1M output tokens": 15
+  },
+  "grok-code-fast-1": {
+    "1M input tokens": 0.2,
+    "1M cached** input tokens": 0.02,
+    "1M output tokens": 1.5
+  },
+  "grok-4-1-fast-reasoning": {
+    "1M input tokens": 0.2,
+    "1M cached** input tokens": 0.05,
+    "1M output tokens": 0.5
+  },
+  "grok-4-1-fast-non-reasoning": {
+    "1M input tokens": 0.2,
+    "1M cached** input tokens": 0.05,
+    "1M output tokens": 0.5
+  }
+}
