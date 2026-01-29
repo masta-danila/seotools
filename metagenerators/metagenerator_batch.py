@@ -10,7 +10,12 @@ from pathlib import Path
 
 # Добавляем путь к текущей папке
 sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from metagenerator import generate_seo_texts
+from logger_config import get_metagenerator_logger
+
+logger = get_metagenerator_logger()
 
 
 async def generate_for_single_url(
@@ -36,7 +41,7 @@ async def generate_for_single_url(
     async with semaphore:
         for attempt in range(max_retries):
             try:
-                print(f"[{attempt + 1}/{max_retries}] Генерация для: {url}")
+                logger.info(f"[{attempt + 1}/{max_retries}] Генерация для: {url}")
                 
                 # Извлекаем данные
                 title_words = url_data.get("lemmatized_title_words", [])
@@ -74,11 +79,11 @@ async def generate_for_single_url(
                     "description_variables": description_variables
                 }
                 
-                print(f"[OK] {url}")
+                logger.info(f"[OK] {url}")
                 return result
                 
             except Exception as e:
-                print(f"[ОШИБКА] Попытка {attempt + 1} для {url}: {str(e)}")
+                logger.error(f"[ОШИБКА] Попытка {attempt + 1} для {url}: {str(e)}")
                 
                 if attempt == max_retries - 1:
                     # Последняя попытка - возвращаем ошибку
@@ -123,10 +128,10 @@ async def generate_metatags_batch(
     Returns:
         Обновленный словарь с добавленными сгенерированными метатегами
     """
-    print(f"\nНачало пакетной генерации метатегов:")
-    print(f"- Модель: {model}")
-    print(f"- Одновременных запросов: {max_concurrent}")
-    print(f"- Попыток на URL: {max_retries}\n")
+    logger.info("Начало пакетной генерации метатегов:")
+    logger.info(f"- Модель: {model}")
+    logger.info(f"- Одновременных запросов: {max_concurrent}")
+    logger.info(f"- Попыток на URL: {max_retries}")
     
     # Создаем семафор для ограничения одновременных запросов
     semaphore = asyncio.Semaphore(max_concurrent)
@@ -149,7 +154,7 @@ async def generate_metatags_batch(
             )
             url_mapping.append((spreadsheet_id, url))
     
-    print(f"Всего URL для обработки: {len(tasks)}\n")
+    logger.info(f"Всего URL для обработки: {len(tasks)}\n")
     
     # Ждем выполнения всех задач
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -197,17 +202,17 @@ async def generate_metatags_batch(
             successful += 1
             total_cost += result.get("cost", 0)
     
-    print(f"\nРезультаты пакетной генерации:")
-    print(f"- Успешно: {successful}")
-    print(f"- Ошибок: {failed}")
-    print(f"- Общая стоимость: ${total_cost:.6f}")
+    logger.info("Результаты пакетной генерации:")
+    logger.info(f"- Успешно: {successful}")
+    logger.info(f"- Ошибок: {failed}")
+    logger.info(f"- Общая стоимость: ${total_cost:.6f}")
     
     if failed > 0:
-        print("\nНе удалось сгенерировать для:")
+        logger.warning("Не удалось сгенерировать для:")
         for spreadsheet_id, url in url_mapping:
             generated = result_data[spreadsheet_id]["urls"][url].get("generated_metatags", {})
             if generated.get("error"):
-                print(f"  - {url}: {generated.get('error', 'Unknown error')}")
+                logger.info(f"  - {url}: {generated.get('error', 'Unknown error')}")
     
     return result_data
 
@@ -229,7 +234,7 @@ def save_batch_results(
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
     
-    print(f"\nРезультаты сохранены в {output_path}")
+    logger.info(f"Результаты сохранены в {output_path}")
 
 
 if __name__ == "__main__":

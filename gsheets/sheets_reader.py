@@ -5,9 +5,18 @@
 """
 import json
 import os
+import sys
 from typing import List, Dict, Optional
+from pathlib import Path
 import gspread
 from google.oauth2.service_account import Credentials
+
+# Добавляем корень проекта в путь для импорта
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from logger_config import get_sheets_reader_logger
+
+logger = get_sheets_reader_logger()
 
 
 def get_sheets_client():
@@ -76,7 +85,7 @@ def get_urls_with_empty_meta(worksheet) -> Dict[str, Dict[str, bool]]:
         title_idx = headers.index('title') if 'title' in headers else headers.index('Title')
         desc_idx = headers.index('description') if 'description' in headers else headers.index('Description')
     except ValueError as e:
-        print(f"Не найдена обязательная колонка: {e}")
+        logger.error(f"Не найдена обязательная колонка: {e}")
         return []
     
     # Собираем URL с незаполненными метатегами
@@ -127,7 +136,7 @@ def get_input_data_for_urls(worksheet, urls_list: List[str]) -> Dict[str, Dict]:
         var_title_idx = headers.index('Variables title') if 'Variables title' in headers else None
         var_desc_idx = headers.index('Variables description') if 'Variables description' in headers else None
     except ValueError as e:
-        print(f"Не найдена колонка URL: {e}")
+        logger.error(f"Не найдена колонка URL: {e}")
         return {}
     
     # Собираем данные для каждого URL (URL может быть в нескольких строках)
@@ -218,38 +227,38 @@ def process_all_spreadsheets() -> Dict:
     all_data = {}
     
     for spreadsheet_id in spreadsheet_ids:
-        print(f"\nОбработка таблицы: {spreadsheet_id}")
+        logger.info(f"Обработка таблицы: {spreadsheet_id}")
         
         try:
             # Открываем таблицу
             spreadsheet = client.open_by_key(spreadsheet_id)
-            print(f"✓ Таблица открыта: {spreadsheet.title}")
+            logger.info(f"✓ Таблица открыта: {spreadsheet.title}")
             
             # Получаем лист "Meta"
             try:
                 meta_sheet = spreadsheet.worksheet("Meta")
             except gspread.exceptions.WorksheetNotFound:
-                print(f"  ✗ Лист 'Meta' не найден")
+                logger.warning(f"  ✗ Лист 'Meta' не найден")
                 continue
             
             # Находим URL с незаполненными метатегами
             urls_list = get_urls_with_empty_meta(meta_sheet)
-            print(f"  Найдено URL с незаполненными метатегами: {len(urls_list)}")
+            logger.info(f"  Найдено URL с незаполненными метатегами: {len(urls_list)}")
             
             if not urls_list:
-                print(f"  ✓ Все метатеги заполнены")
+                logger.info(f"  ✓ Все метатеги заполнены")
                 continue
             
             # Получаем лист "Data"
             try:
                 input_sheet = spreadsheet.worksheet("Data")
             except gspread.exceptions.WorksheetNotFound:
-                print(f"  ✗ Лист 'Data' не найден")
+                logger.warning(f"  ✗ Лист 'Data' не найден")
                 continue
             
             # Получаем вводные данные для URL
             input_data = get_input_data_for_urls(input_sheet, urls_list)
-            print(f"  Получено данных для URL: {len(input_data)}")
+            logger.info(f"  Получено данных для URL: {len(input_data)}")
             
             # Сохраняем данные для этой таблицы
             all_data[spreadsheet_id] = {
@@ -257,9 +266,7 @@ def process_all_spreadsheets() -> Dict:
             }
             
         except Exception as e:
-            print(f"  ✗ Ошибка при обработке таблицы {spreadsheet_id}: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"  ✗ Ошибка при обработке таблицы {spreadsheet_id}: {e}", exc_info=True)
             continue
     
     return all_data
@@ -278,15 +285,15 @@ def save_to_json(data: Dict, filename: str = "jsontests/sheets_data.json") -> No
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     
-    print(f"\n✓ Данные сохранены в файл: {filename}")
+    logger.info(f"✓ Данные сохранены в файл: {filename}")
 
 
 if __name__ == "__main__":
     """
     Тест чтения данных из Google Sheets
     """
-    print("Начало обработки Google Sheets...")
-    print("="*80)
+    logger.info("Начало обработки Google Sheets...")
+    logger.info("="*80)
     
     try:
         # Обрабатываем все таблицы
@@ -296,38 +303,36 @@ if __name__ == "__main__":
         save_to_json(data)
         
         # Выводим краткую статистику
-        print("\n" + "="*80)
-        print("СТАТИСТИКА:")
-        print("="*80)
+        logger.info("="*80)
+        logger.info("СТАТИСТИКА:")
+        logger.info("="*80)
         
         total_urls = 0
         for spreadsheet_id, sheet_data in data.items():
             urls_count = len(sheet_data.get('urls', {}))
             total_urls += urls_count
-            print(f"\nТаблица ID: {spreadsheet_id}")
-            print(f"  URL для обработки: {urls_count}")
+            logger.info(f"Таблица ID: {spreadsheet_id}")
+            logger.info(f"  URL для обработки: {urls_count}")
         
-        print(f"\nВсего URL для обработки: {total_urls}")
+        logger.info(f"Всего URL для обработки: {total_urls}")
         
         # Выводим пример данных
         if data:
-            print("\n" + "="*80)
-            print("ПРИМЕР ДАННЫХ:")
-            print("="*80)
+            logger.info("="*80)
+            logger.info("ПРИМЕР ДАННЫХ:")
+            logger.info("="*80)
             
             first_sheet = list(data.values())[0]
             if first_sheet.get('urls'):
                 first_url = list(first_sheet['urls'].keys())[0]
                 first_data = first_sheet['urls'][first_url]
                 
-                print(f"\nURL: {first_url}")
-                print(f"Запросы: {first_data.get('queries', [])}")
-                print(f"Компания: {first_data.get('company_name', '')}")
-                print(f"Переменные h1: {first_data.get('variables_h1', [])}")
-                print(f"Переменные title: {first_data.get('variables_title', [])}")
-                print(f"Переменные description: {first_data.get('variables_description', [])}")
+                logger.info(f"URL: {first_url}")
+                logger.info(f"Запросы: {first_data.get('queries', [])}")
+                logger.info(f"Компания: {first_data.get('company_name', '')}")
+                logger.info(f"Переменные h1: {first_data.get('variables_h1', [])}")
+                logger.info(f"Переменные title: {first_data.get('variables_title', [])}")
+                logger.info(f"Переменные description: {first_data.get('variables_description', [])}")
         
     except Exception as e:
-        print(f"\nОшибка: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Ошибка: {e}", exc_info=True)

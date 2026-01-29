@@ -9,7 +9,12 @@ from pathlib import Path
 
 # Добавляем путь к модулю lemmatizer
 sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from lemmatizer import find_common_words
+from logger_config import get_lemmatizer_logger
+
+logger = get_lemmatizer_logger()
 
 
 def process_urls_with_lemmatization(
@@ -72,7 +77,7 @@ def process_urls_with_lemmatization(
             result_data[spreadsheet_id]["urls"][url]["lemmatized_title_words"] = lemmatized_title_words
             result_data[spreadsheet_id]["urls"][url]["lemmatized_description_words"] = lemmatized_description_words
             
-            print(f"[OK] {url}: title words={len(lemmatized_title_words)}, desc words={len(lemmatized_description_words)}")
+            logger.info(f"[OK] {url}: title words={len(lemmatized_title_words)}, desc words={len(lemmatized_description_words)}")
     
     return result_data
 
@@ -92,7 +97,7 @@ def save_results_to_json(results: Dict, filename: str = "jsontests/lemmatizer_pr
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
     
-    print(f"\nРезультаты сохранены в файл: {filename}")
+    logger.info(f"Результаты сохранены в файл: {filename}")
 
 
 if __name__ == "__main__":

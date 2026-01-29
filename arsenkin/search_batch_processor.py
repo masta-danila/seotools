@@ -6,11 +6,16 @@ import sys
 import json
 import asyncio
 from typing import Dict, List, Optional
+from pathlib import Path
 
 # Добавляем текущую директорию в путь для импорта
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from search_parser import get_top_results
+from logger_config import get_search_logger
+
+logger = get_search_logger()
 
 
 async def process_url(
@@ -42,10 +47,10 @@ async def process_url(
     queries = url_data.get('queries', [])
     
     if not queries:
-        print(f"[SKIP] Пропущен {url}: нет запросов")
+        logger.info(f"[SKIP] Пропущен {url}: нет запросов")
         return {**url_data, 'filtered_urls': []}
     
-    print(f"[PROCESS] Обработка {url} ({len(queries)} запросов, топ-{urls_per_query} от каждого)...")
+    logger.info(f"[PROCESS] Обработка {url} ({len(queries)} запросов, топ-{urls_per_query} от каждого)...")
     
     try:
         result = await get_top_results(
@@ -61,15 +66,15 @@ async def process_url(
         # Результат - список уникальных URL
         if result and isinstance(result, list):
             filtered_urls = result
-            print(f"[OK] {url}: найдено {len(filtered_urls)} уникальных конкурентов")
+            logger.info(f"[OK] {url}: найдено {len(filtered_urls)} уникальных конкурентов")
         else:
             filtered_urls = []
-            print(f"[WARN] {url}: конкуренты не найдены")
+            logger.warning(f"[WARN] {url}: конкуренты не найдены")
         
         return {**url_data, 'filtered_urls': filtered_urls}
     
     except Exception as e:
-        print(f"[ERROR] Ошибка при обработке {url}: {e}")
+        logger.error(f"[ERROR] Ошибка при обработке {url}: {e}")
         return {**url_data, 'filtered_urls': []}
 
 
@@ -125,9 +130,7 @@ async def process_sheets_data(
         for url, url_data in urls_dict.items():
             tasks.append(process_with_semaphore(spreadsheet_id, url, url_data))
     
-    print(f"\n{'='*80}")
-    print(f"Запуск обработки {len(tasks)} URL (макс. {max_concurrent} одновременно)")
-    print(f"{'='*80}\n")
+    logger.info(f"Запуск обработки {len(tasks)} URL (макс. {max_concurrent} одновременно)")
     
     # Выполняем все задачи
     results = await asyncio.gather(*tasks)
@@ -138,9 +141,7 @@ async def process_sheets_data(
             result_data[spreadsheet_id] = {'urls': {}}
         result_data[spreadsheet_id]['urls'][url] = processed_url_data
     
-    print(f"\n{'='*80}")
-    print(f"Обработка завершена!")
-    print(f"{'='*80}\n")
+    logger.info("Обработка завершена!")
     
     return result_data
 
@@ -158,9 +159,9 @@ def save_results_to_json(results: Dict, filename: str = "jsontests/search_batch_
     try:
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(results, f, ensure_ascii=False, indent=2)
-        print(f"\nРезультаты сохранены в файл: {filename}")
+        logger.info(f"Результаты сохранены в файл: {filename}")
     except Exception as e:
-        print(f"Ошибка при сохранении файла: {e}")
+        logger.error(f"Ошибка при сохранении файла: {e}")
 
 
 if __name__ == "__main__":

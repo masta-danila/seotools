@@ -3,11 +3,20 @@
 Документация: https://help.arsenkin.ru/api/api-check-h
 """
 import os
+import sys
 import json
 import asyncio
 from typing import List, Dict, Optional
+from pathlib import Path
 from dotenv import load_dotenv
 import httpx
+
+# Добавляем корень проекта в путь для импорта
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from logger_config import get_parser_logger
+
+logger = get_parser_logger()
 
 # Загружаем переменные окружения из корня проекта
 load_dotenv()
@@ -61,44 +70,44 @@ async def create_task_by_urls(
         },
     }
     
-    print(f"[DEBUG] create_task_by_urls: отправка {len(urls)} URL")
-    print(f"[DEBUG] create_task_by_urls: первые 2 URL: {urls[:2]}")
+    logger.debug(f"[DEBUG] create_task_by_urls: отправка {len(urls)} URL")
+    logger.debug(f"[DEBUG] create_task_by_urls: первые 2 URL: {urls[:2]}")
 
     for attempt in range(max_retries):
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 response = await client.post(API_SET_URL, headers=get_headers(), json=payload)
             
-            print(f"[DEBUG] create_task_by_urls: status_code={response.status_code}")
+            logger.debug(f"[DEBUG] create_task_by_urls: status_code={response.status_code}")
             
             # Обработка 429 (Too Many Requests)
             if response.status_code == 429:
                 wait_time = 60 * (attempt + 1)  # 60, 120, 180 секунд
-                print(f"[WARN] Rate limit (429). Попытка {attempt + 1}/{max_retries}. Ожидание {wait_time} сек...")
+                logger.warning(f"[WARN] Rate limit (429). Попытка {attempt + 1}/{max_retries}. Ожидание {wait_time} сек...")
                 if attempt < max_retries - 1:
                     await asyncio.sleep(wait_time)
                     continue
                 else:
-                    print(f"[ERROR] Превышено максимальное количество попыток при rate limit")
+                    logger.error(f"[ERROR] Превышено максимальное количество попыток при rate limit")
                     return None
             
             response.raise_for_status()
 
             data = response.json()
-            print(f"[DEBUG] create_task_by_urls: response data={data}")
+            logger.debug(f"[DEBUG] create_task_by_urls: response data={data}")
             task_id = data.get("task_id")
             if task_id:
-                print(f"[DEBUG] create_task_by_urls: успешно создана задача task_id={task_id}")
+                logger.debug(f"[DEBUG] create_task_by_urls: успешно создана задача task_id={task_id}")
                 return task_id
             else:
-                print(f"[ERROR] create_task_by_urls: в ответе нет task_id")
+                logger.error(f"[ERROR] create_task_by_urls: в ответе нет task_id")
                 return None
 
         except httpx.RequestError as e:
-            print(f"[ERROR] create_task_by_urls: RequestError - {e}")
+            logger.error(f"[ERROR] create_task_by_urls: RequestError - {e}")
             return None
         except Exception as e:
-            print(f"[ERROR] create_task_by_urls: Exception - {type(e).__name__}: {e}")
+            logger.error(f"[ERROR] create_task_by_urls: Exception - {type(e).__name__}: {e}")
             return None
     
     return None
@@ -173,7 +182,7 @@ async def wait_for_task(task_id: int, max_wait_time: int = 300, check_interval: 
 
     while elapsed_time < max_wait_time:
         status = await check_task_status(task_id)
-        print(f"[check] t={elapsed_time}s status={status}")
+        logger.info(f"[check] t={elapsed_time}s status={status}")
 
         if status == "finish":
             return await get_task_result(task_id)
@@ -183,7 +192,7 @@ async def wait_for_task(task_id: int, max_wait_time: int = 300, check_interval: 
             await asyncio.sleep(check_interval)
             elapsed_time += check_interval
 
-    print(f"Превышено время ожидания ({max_wait_time}s)")
+    logger.warning(f"Превышено время ожидания ({max_wait_time}s)")
     return None
 
 
@@ -245,7 +254,7 @@ async def get_h_tags_by_urls(
     )
 
     if not task_id:
-        print(f"[ERROR] Не удалось создать задачу в Arsenkin API")
+        logger.error(f"[ERROR] Не удалось создать задачу в Arsenkin API")
         return {}
 
     # Интервал опроса зависит от числа URL'ов, чтобы реже дергать API
@@ -257,12 +266,12 @@ async def get_h_tags_by_urls(
     )
     
     if not result_data:
-        print(f"[ERROR] Не получены данные от Arsenkin API (task_id: {task_id})")
+        logger.error(f"[ERROR] Не получены данные от Arsenkin API (task_id: {task_id})")
         return {}
     
     # Парсируем результат в словарь {url: {title, description}}
     parsed = parse_h_results(result_data)
-    print(f"[DEBUG] parse_h_results вернул {len(parsed)} записей")
+    logger.debug(f"[DEBUG] parse_h_results вернул {len(parsed)} записей")
     return parsed
 
 
@@ -281,9 +290,9 @@ def save_results_to_json(results: Dict, filename: str = "jsontests/arsenkin_h_re
     try:
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(results, f, ensure_ascii=False, indent=2)
-        print(f"\nРезультаты сохранены в файл: {filename}")
+        logger.info(f"Результаты сохранены в файл: {filename}")
     except Exception as e:
-        print(f"Ошибка при сохранении файла: {e}")
+        logger.error(f"Ошибка при сохранении файла: {e}")
 
 
 async def process_batch_results_with_metatags(
@@ -316,11 +325,11 @@ async def process_batch_results_with_metatags(
     all_urls = list(all_urls)
     
     if not all_urls:
-        print("[WARN] Не найдено filtered_urls для обработки")
+        logger.warning("[WARN] Не найдено filtered_urls для обработки")
         return batch_data
     
-    print(f"[PROCESS] Получение метатегов для {len(all_urls)} URL...")
-    print(f"[DEBUG] Первые 3 URL: {all_urls[:3]}")
+    logger.info(f"[PROCESS] Получение метатегов для {len(all_urls)} URL...")
+    logger.debug(f"[DEBUG] Первые 3 URL: {all_urls[:3]}")
     
     # Получаем метатеги для всех URL
     metatags = await get_h_tags_by_urls(
@@ -330,12 +339,12 @@ async def process_batch_results_with_metatags(
         wait_per_url=wait_per_url,
     )
     
-    print(f"[OK] Получено метатегов: {len(metatags)}")
+    logger.info(f"[OK] Получено метатегов: {len(metatags)}")
     if metatags:
         first_url = list(metatags.keys())[0]
-        print(f"[DEBUG] Пример метатегов для {first_url}: {metatags[first_url]}")
+        logger.debug(f"[DEBUG] Пример метатегов для {first_url}: {metatags[first_url]}")
     else:
-        print(f"[WARN] Словарь metatags пустой!")
+        logger.warning(f"[WARN] Словарь metatags пустой!")
     
     # Обновляем batch_data: заменяем filtered_urls на список словарей с метатегами
     for spreadsheet_id, spreadsheet_info in batch_data.items():

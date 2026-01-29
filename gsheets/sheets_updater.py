@@ -2,11 +2,19 @@
 Модуль для обновления Google Таблиц сгенерированными метатегами
 """
 import json
+import sys
 import gspread
 from google.oauth2.service_account import Credentials
 from typing import Dict, List
 from pathlib import Path
 import time
+
+# Добавляем корень проекта в путь для импорта
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from logger_config import get_sheets_updater_logger
+
+logger = get_sheets_updater_logger()
 
 
 def get_sheets_client():
@@ -230,13 +238,11 @@ def update_all_spreadsheets(
     Returns:
         Общая статистика по всем таблицам
     """
-    print("\n" + "="*80)
-    print("НАЧАЛО ОБНОВЛЕНИЯ GOOGLE ТАБЛИЦ")
-    print("="*80)
+    logger.info("НАЧАЛО ОБНОВЛЕНИЯ GOOGLE ТАБЛИЦ")
     
     # Создаем клиент
     client = get_sheets_client()
-    print("[OK] Авторизация в Google Sheets успешна")
+    logger.info("[OK] Авторизация в Google Sheets успешна")
     
     # Общая статистика
     total_stats = {
@@ -254,14 +260,12 @@ def update_all_spreadsheets(
     for spreadsheet_id, spreadsheet_data in data.items():
         total_stats["spreadsheets_processed"] += 1
         
-        print(f"\n{'='*80}")
-        print(f"Обработка таблицы: {spreadsheet_id}")
-        print(f"{'='*80}")
+        logger.info(f"Обработка таблицы: {spreadsheet_id}")
         
         urls_data = spreadsheet_data.get("urls", {})
         
         if not urls_data:
-            print("[ПРОПУСК] Нет данных для обновления")
+            logger.warning("[ПРОПУСК] Нет данных для обновления")
             total_stats["spreadsheets_failed"] += 1
             continue
         
@@ -287,17 +291,14 @@ def update_all_spreadsheets(
             total_stats["spreadsheets_failed"] += 1
     
     # Итоговая статистика
-    print("\n" + "="*80)
-    print("ИТОГОВАЯ СТАТИСТИКА")
-    print("="*80)
-    print(f"Таблиц обработано: {total_stats['spreadsheets_processed']}")
-    print(f"Таблиц успешно: {total_stats['spreadsheets_success']}")
-    print(f"Таблиц с ошибками: {total_stats['spreadsheets_failed']}")
-    print(f"\nURL обработано: {total_stats['total_urls_processed']}")
-    print(f"URL обновлено: {total_stats['total_urls_updated']}")
-    print(f"URL пропущено: {total_stats['total_urls_skipped']}")
-    print(f"Ошибок: {total_stats['total_errors']}")
-    print("="*80)
+    logger.info("ИТОГОВАЯ СТАТИСТИКА")
+    logger.info(f"Таблиц обработано: {total_stats['spreadsheets_processed']}")
+    logger.info(f"Таблиц успешно: {total_stats['spreadsheets_success']}")
+    logger.info(f"Таблиц с ошибками: {total_stats['spreadsheets_failed']}")
+    logger.info(f"URL обработано: {total_stats['total_urls_processed']}")
+    logger.info(f"URL обновлено: {total_stats['total_urls_updated']}")
+    logger.info(f"URL пропущено: {total_stats['total_urls_skipped']}")
+    logger.info(f"Ошибок: {total_stats['total_errors']}")
     
     return total_stats
 
@@ -310,11 +311,11 @@ if __name__ == "__main__":
     project_root = Path(__file__).parent.parent
     input_file = project_root / "jsontests" / "metagenerator_batch_results.json"
     
-    print("Загрузка данных из metagenerator_batch_results.json...")
+    logger.info("Загрузка данных из metagenerator_batch_results.json...")
     with open(input_file, "r", encoding="utf-8") as f:
         data = json.load(f)
     
-    print(f"[OK] Загружено данных для {len(data)} таблиц")
+    logger.info(f"[OK] Загружено данных для {len(data)} таблиц")
     
     # Обновляем все таблицы
     stats = update_all_spreadsheets(
@@ -328,4 +329,4 @@ if __name__ == "__main__":
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(stats, f, ensure_ascii=False, indent=2)
     
-    print(f"\nСтатистика сохранена в: {output_file}")
+    logger.info(f"Статистика сохранена в: {output_file}")

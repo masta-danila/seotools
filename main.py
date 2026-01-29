@@ -45,9 +45,7 @@ def save_step_results(data, filename: str):
 async def run_full_pipeline():
     """Запускает полный цикл генерации метатегов"""
     
-    logger.info("="*80)
     logger.info("ЗАПУСК ПОЛНОГО ЦИКЛА ГЕНЕРАЦИИ МЕТАТЕГОВ")
-    logger.info("="*80)
     
     # Шаг 1: Чтение Google Sheets
     logger.info("ШАГ 1/6: Чтение данных из Google Sheets")
@@ -121,9 +119,7 @@ async def run_full_pipeline():
     )
     # save_step_results(stats, "step6_update_stats.json")
     
-    logger.info("="*80)
     logger.info("ЦИКЛ ЗАВЕРШЕН УСПЕШНО")
-    logger.info("="*80)
 
 
 if __name__ == "__main__":

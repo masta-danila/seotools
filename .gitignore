@@ -11,6 +11,7 @@ env/
 # Secrets and credentials
 .env
 gsheets/credentials.json
+gsheets/sheets_config.json
 
 # IDE
 .vscode/

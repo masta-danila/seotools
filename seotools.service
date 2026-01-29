@@ -1,0 +1,17 @@
+[Unit]
+Description=SEO Tools Meta Generator Service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=callchecker
+Group=callchecker
+WorkingDirectory=/home/callchecker/seotools
+Environment=PATH=/home/callchecker/seotools/venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/callchecker/seotools/venv/bin/python main.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

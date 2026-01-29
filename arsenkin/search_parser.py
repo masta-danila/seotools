@@ -3,12 +3,21 @@
 Документация: https://help.arsenkin.ru/api/api-top
 """
 import os
+import sys
 import json
 import asyncio
 from typing import List, Dict, Optional, Union, Set
 from urllib.parse import urlparse
+from pathlib import Path
 from dotenv import load_dotenv
 import httpx
+
+# Добавляем корень проекта в путь для импорта
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from logger_config import get_search_logger
+
+logger = get_search_logger()
 
 # Загружаем переменные окружения из корня проекта
 load_dotenv()
@@ -158,7 +167,7 @@ async def wait_for_task(task_id: int, max_wait_time: int = 300, check_interval: 
 
     while elapsed_time < max_wait_time:
         status = await check_task_status(task_id)
-        print(f"[check] t={elapsed_time}s status={status}")
+        logger.info(f"[check] t={elapsed_time}s status={status}")
 
         if status == "finish":
             return await get_task_result(task_id)
@@ -168,7 +177,7 @@ async def wait_for_task(task_id: int, max_wait_time: int = 300, check_interval: 
             await asyncio.sleep(check_interval)
             elapsed_time += check_interval
 
-    print(f"Превышено время ожидания ({max_wait_time}s)")
+    logger.warning(f"Превышено время ожидания ({max_wait_time}s)")
     return None
 
 
@@ -192,11 +201,11 @@ def load_blacklist_domains() -> Set[str]:
         _blacklist_cache = set(domains)
         return _blacklist_cache
     except FileNotFoundError:
-        print(f"[WARN] Файл черного списка не найден: {blacklist_path}")
+        logger.warning(f"[WARN] Файл черного списка не найден: {blacklist_path}")
         _blacklist_cache = set()
         return _blacklist_cache
     except Exception as e:
-        print(f"[ERROR] Ошибка при загрузке черного списка: {e}")
+        logger.error(f"[ERROR] Ошибка при загрузке черного списка: {e}")
         _blacklist_cache = set()
         return _blacklist_cache
 
@@ -310,7 +319,7 @@ def extract_top_urls_from_queries(
                     all_urls.add(url)
     
     if filtered_count > 0:
-        print(f"[INFO] Отфильтровано URL из черного списка: {filtered_count}")
+        logger.info(f"[INFO] Отфильтровано URL из черного списка: {filtered_count}")
     
     # Возвращаем список уникальных URL
     return list(all_urls)
@@ -400,9 +409,9 @@ def save_results_to_json(results: Dict, filename: str = "jsontests/arsenkin_resu
     try:
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(results, f, ensure_ascii=False, indent=2)
-        print(f"\nРезультаты сохранены в файл: {filename}")
+        logger.info(f"Результаты сохранены в файл: {filename}")
     except Exception as e:
-        print(f"Ошибка при сохранении файла: {e}")
+        logger.error(f"Ошибка при сохранении файла: {e}")
 
 
 if __name__ == "__main__":
@@ -437,11 +446,11 @@ if __name__ == "__main__":
     ))
     
     if results:
-        print(f"\nНайдено уникальных URL: {len(results)}")
-        print("\nСписок URL:")
+        logger.info(f"Найдено уникальных URL: {len(results)}")
+        logger.info("Список URL:")
         for i, url in enumerate(results, 1):
-            print(f"{i}. {url}")
+            logger.info(f"{i}. {url}")
         
         save_results_to_json(results, "jsontests/arsenkin_top_results.json")
     else:
-        print("Не удалось получить результаты")
+        logger.warning("Не удалось получить результаты")
