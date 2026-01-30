@@ -70,18 +70,16 @@ def update_spreadsheet_metatags(
     client,
     spreadsheet_id: str,
     urls_data: Dict,
-    sheet_name: str = "Meta",
-    delay: float = 1.0
+    sheet_name: str = "Meta"
 ) -> Dict:
     """
-    Обновляет метатеги в Google Таблице для всех URL
+    Обновляет метатеги в Google Таблице для всех URL (батчевое обновление)
     
     Args:
         client: Авторизованный клиент gspread
         spreadsheet_id: ID таблицы
         urls_data: Словарь с данными URL и сгенерированными метатегами
         sheet_name: Название листа (по умолчанию "Meta")
-        delay: Задержка между запросами (секунды)
         
     Returns:
         Словарь со статистикой обновлений
@@ -97,33 +95,36 @@ def update_spreadsheet_metatags(
     try:
         # Открываем таблицу
         spreadsheet = client.open_by_key(spreadsheet_id)
-        print(f"\n[OK] Открыта таблица: {spreadsheet.title}")
+        logger.info(f"[OK] Открыта таблица: {spreadsheet.title}")
         
         # Открываем лист
         try:
             worksheet = spreadsheet.worksheet(sheet_name)
-            print(f"[OK] Открыт лист: {sheet_name}")
+            logger.info(f"[OK] Открыт лист: {sheet_name}")
         except gspread.WorksheetNotFound:
-            print(f"[ОШИБКА] Лист '{sheet_name}' не найден")
+            logger.error(f"[ОШИБКА] Лист '{sheet_name}' не найден")
             stats["errors"] += len(urls_data)
             return stats
         
         # Получаем заголовки (первая строка)
         headers = worksheet.row_values(1)
         
-        # Находим индексы нужных колонок (гибкий поиск - сначала маленькие, потом большие буквы)
+        # Находим индексы нужных колонок (гибкий поиск)
         try:
             url_col_idx = (headers.index('URL') if 'URL' in headers else headers.index('url')) + 1
             h1_col_idx = (headers.index('h1') if 'h1' in headers else headers.index('H1')) + 1
             title_col_idx = (headers.index('title') if 'title' in headers else headers.index('Title')) + 1
             description_col_idx = (headers.index('description') if 'description' in headers else headers.index('Description')) + 1
         except ValueError as e:
-            print(f"[ОШИБКА] Не найдена необходимая колонка: {e}")
-            print(f"[DEBUG] Доступные колонки: {headers}")
+            logger.error(f"[ОШИБКА] Не найдена необходимая колонка: {e}")
+            logger.error(f"[DEBUG] Доступные колонки: {headers}")
             stats["errors"] += len(urls_data)
             return stats
         
-        print(f"[INFO] Найдены колонки: URL={url_col_idx}, H1={h1_col_idx}, Title={title_col_idx}, Description={description_col_idx}")
+        logger.info(f"[INFO] Найдены колонки: URL={url_col_idx}, H1={h1_col_idx}, Title={title_col_idx}, Description={description_col_idx}")
+        
+        # Собираем все обновления в один батч
+        batch_updates = []
         
         # Обрабатываем каждый URL
         for url, url_info in urls_data.items():
@@ -133,7 +134,7 @@ def update_spreadsheet_metatags(
             row_num = find_url_row(worksheet, url)
             
             if row_num is None:
-                print(f"[ПРОПУСК] URL не найден в таблице: {url}")
+                logger.warning(f"[ПРОПУСК] URL не найден в таблице: {url}")
                 stats["skipped"] += 1
                 stats["details"].append({
                     "url": url,
@@ -144,7 +145,7 @@ def update_spreadsheet_metatags(
             # Проверяем, есть ли сгенерированные метатеги
             generated = url_info.get("generated_metatags")
             if not generated or generated.get("error"):
-                print(f"[ПРОПУСК] Нет сгенерированных метатегов для: {url}")
+                logger.warning(f"[ПРОПУСК] Нет сгенерированных метатегов для: {url}")
                 stats["skipped"] += 1
                 stats["details"].append({
                     "url": url,
@@ -159,55 +160,42 @@ def update_spreadsheet_metatags(
             current_description = worksheet.cell(row_num, description_col_idx).value
             
             # Подготавливаем обновления только для пустых полей
-            updates = []
+            url_updates = []
             
             # H1 - заполняем если пусто
             if not current_h1 and generated.get("h1"):
-                updates.append({
+                url_updates.append({
                     "range": f"{chr(64 + h1_col_idx)}{row_num}",
-                    "value": generated["h1"]
+                    "values": [[generated["h1"]]]
                 })
             
             # Title - заполняем если пусто
             if not current_title and generated.get("title"):
-                updates.append({
+                url_updates.append({
                     "range": f"{chr(64 + title_col_idx)}{row_num}",
-                    "value": generated["title"]
+                    "values": [[generated["title"]]]
                 })
             
             # Description - заполняем если пусто
             if not current_description and generated.get("description"):
-                updates.append({
+                url_updates.append({
                     "range": f"{chr(64 + description_col_idx)}{row_num}",
-                    "value": generated["description"]
+                    "values": [[generated["description"]]]
                 })
             
-            # Применяем обновления
-            if updates:
-                try:
-                    for update in updates:
-                        worksheet.update(update["range"], [[update["value"]]])
-                        time.sleep(delay)  # Задержка между запросами
-                    
-                    print(f"[OK] Обновлено {len(updates)} полей для: {url} (строка {row_num})")
-                    stats["updated"] += 1
-                    stats["details"].append({
-                        "url": url,
-                        "status": "updated",
-                        "row": row_num,
-                        "fields_updated": len(updates)
-                    })
-                except Exception as e:
-                    print(f"[ОШИБКА] Обновление {url}: {str(e)}")
-                    stats["errors"] += 1
-                    stats["details"].append({
-                        "url": url,
-                        "status": "error",
-                        "row": row_num,
-                        "error": str(e)
-                    })
+            # Добавляем обновления в общий батч
+            if url_updates:
+                batch_updates.extend(url_updates)
+                logger.info(f"[ПОДГОТОВКА] Добавлено {len(url_updates)} полей для: {url} (строка {row_num})")
+                stats["updated"] += 1
+                stats["details"].append({
+                    "url": url,
+                    "status": "prepared",
+                    "row": row_num,
+                    "fields_updated": len(url_updates)
+                })
             else:
-                print(f"[ПРОПУСК] Все поля уже заполнены для: {url} (строка {row_num})")
+                logger.info(f"[ПРОПУСК] Все поля уже заполнены для: {url} (строка {row_num})")
                 stats["skipped"] += 1
                 stats["details"].append({
                     "url": url,
@@ -215,8 +203,23 @@ def update_spreadsheet_metatags(
                     "row": row_num
                 })
         
+        # Применяем все обновления одним батчем
+        if batch_updates:
+            try:
+                logger.info(f"[BATCH] Применение {len(batch_updates)} обновлений одним запросом...")
+                worksheet.batch_update(batch_updates)
+                logger.info(f"[OK] Батчевое обновление выполнено успешно")
+            except Exception as e:
+                logger.error(f"[ОШИБКА] Батчевое обновление: {str(e)}")
+                stats["errors"] += len(batch_updates)
+                # Помечаем все подготовленные URL как ошибочные
+                for detail in stats["details"]:
+                    if detail.get("status") == "prepared":
+                        detail["status"] = "error"
+                        detail["error"] = str(e)
+        
     except Exception as e:
-        print(f"[ОШИБКА] Обработка таблицы {spreadsheet_id}: {str(e)}")
+        logger.error(f"[ОШИБКА] Обработка таблицы {spreadsheet_id}: {str(e)}")
         stats["errors"] += len(urls_data) - stats["processed"]
     
     return stats
@@ -224,16 +227,14 @@ def update_spreadsheet_metatags(
 
 def update_all_spreadsheets(
     data: Dict,
-    sheet_name: str = "Meta",
-    delay: float = 1.0
+    sheet_name: str = "Meta"
 ) -> Dict:
     """
-    Обновляет все таблицы из данных metagenerator_batch_results.json
+    Обновляет все таблицы из данных metagenerator_batch_results.json (батчевое обновление)
     
     Args:
         data: Словарь с данными из metagenerator_batch_results.json
         sheet_name: Название листа для обновления
-        delay: Задержка между запросами (секунды)
         
     Returns:
         Общая статистика по всем таблицам
@@ -269,13 +270,12 @@ def update_all_spreadsheets(
             total_stats["spreadsheets_failed"] += 1
             continue
         
-        # Обновляем таблицу
+        # Обновляем таблицу (батчевое обновление)
         stats = update_spreadsheet_metatags(
             client=client,
             spreadsheet_id=spreadsheet_id,
             urls_data=urls_data,
-            sheet_name=sheet_name,
-            delay=delay
+            sheet_name=sheet_name
         )
         
         # Обновляем общую статистику
@@ -317,11 +317,10 @@ if __name__ == "__main__":
     
     logger.info(f"[OK] Загружено данных для {len(data)} таблиц")
     
-    # Обновляем все таблицы
+    # Обновляем все таблицы (батчевое обновление)
     stats = update_all_spreadsheets(
         data=data,
-        sheet_name="Meta",
-        delay=1.0  # 1 секунда между запросами
+        sheet_name="Meta"
     )
     
     # Сохраняем статистику

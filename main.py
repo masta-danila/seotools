@@ -114,8 +114,7 @@ async def run_full_pipeline():
     logger.info("ШАГ 6/6: Загрузка результатов в Google Sheets")
     stats = update_all_spreadsheets(
         data=data,
-        sheet_name="Meta",
-        delay=1.0
+        sheet_name="Meta"
     )
     # save_step_results(stats, "step6_update_stats.json")
     
