@@ -44,9 +44,9 @@ else
     echo "Google Sheets credentials найдены"
 fi
 
-# 5. Проверяем sheets_config.json
-if [ ! -f "gsheets/sheets_config.json" ]; then
-    echo "ОШИБКА: Файл gsheets/sheets_config.json не найден!"
+# 5. Проверяем spreadsheets.json
+if [ ! -f "gsheets/spreadsheets.json" ]; then
+    echo "ОШИБКА: Файл gsheets/spreadsheets.json не найден!"
     echo "Создайте файл с ID Google таблиц"
     exit 1
 else

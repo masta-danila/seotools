@@ -42,7 +42,7 @@ cd seotools
 ### 2.1. На локальной машине убедитесь, что у вас есть:
 - `.env` - API ключи (ANTHROPIC_API_KEY, OPENAI_API_KEY, ARSENKIN_API_KEY и др.)
 - `gsheets/credentials.json` - credentials из Google Cloud Console
-- `gsheets/sheets_config.json` - ID Google таблиц
+- `gsheets/spreadsheets.json` - ID Google таблиц
 
 ### 2.2. Скопируйте файлы на сервер:
 ```bash
@@ -56,7 +56,7 @@ scp .env callchecker@YOUR_SERVER_IP:/home/callchecker/seotools/
 scp gsheets/credentials.json callchecker@YOUR_SERVER_IP:/home/callchecker/seotools/gsheets/
 
 # Копируем конфигурацию таблиц
-scp gsheets/sheets_config.json callchecker@YOUR_SERVER_IP:/home/callchecker/seotools/gsheets/
+scp gsheets/spreadsheets.json callchecker@YOUR_SERVER_IP:/home/callchecker/seotools/gsheets/
 ```
 
 ## Шаг 3: Установка зависимостей и проверка
@@ -273,7 +273,7 @@ python -c "from dotenv import load_dotenv; import os; load_dotenv(); \
     │   └── blacklist_domains.json
     ├── gsheets/
     │   ├── credentials.json        ← Важно!
-    │   ├── sheets_config.json      ← Важно!
+    │   ├── spreadsheets.json       ← Важно!
     │   ├── sheets_reader.py
     │   └── sheets_updater.py
     ├── lemmatizers/

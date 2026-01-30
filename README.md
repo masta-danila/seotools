@@ -57,14 +57,12 @@ GROK_API_KEY=your_grok_key
 5. Скачайте JSON ключ
 6. Сохраните как `gsheets/credentials.json`
 
-#### 5.2. Создайте sheets_config.json:
+#### 5.2. Создайте spreadsheets.json:
 ```json
-{
-  "spreadsheet_ids": [
-    "YOUR_SPREADSHEET_ID_1",
-    "YOUR_SPREADSHEET_ID_2"
-  ]
-}
+[
+  "YOUR_SPREADSHEET_ID_1",
+  "YOUR_SPREADSHEET_ID_2"
+]
 ```
 
 ### 6. Запуск
@@ -86,7 +84,7 @@ seotools/
 │   ├── sheets_reader.py   # Чтение данных
 │   ├── sheets_updater.py  # Обновление данных
 │   ├── credentials.json   # (не в git)
-│   └── sheets_config.json # (не в git)
+│   └── spreadsheets.json # (не в git)
 ├── lemmatizers/           # Лемматизация текстов
 │   ├── lemmatizer.py
 │   └── lemmatizer_processor.py

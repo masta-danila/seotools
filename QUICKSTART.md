@@ -46,15 +46,13 @@ GROK_API_KEY=...
    - Скачайте файл
 6. Сохраните как `gsheets/credentials.json`
 
-#### 3.2. Создание sheets_config.json
+#### 3.2. Создание spreadsheets.json
 ```bash
-# В папке gsheets/ создайте файл sheets_config.json
-cat > gsheets/sheets_config.json <<EOF
-{
-  "spreadsheet_ids": [
-    "1O5dGWkcrg09dZRXnT2YpXUQsA23VMFhg-_ShM6Z1g5Q"
-  ]
-}
+# В папке gsheets/ создайте файл spreadsheets.json
+cat > gsheets/spreadsheets.json <<EOF
+[
+  "1O5dGWkcrg09dZRXnT2YpXUQsA23VMFhg-_ShM6Z1g5Q"
+]
 EOF
 ```
 
