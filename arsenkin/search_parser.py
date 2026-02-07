@@ -179,6 +179,10 @@ async def wait_for_task(task_id: int, max_wait_time: int = 300, check_interval: 
     elapsed_time = 0
 
     while elapsed_time < max_wait_time:
+        # Сначала ждём интервал (экономим API запрос на нулевой проверке)
+        await asyncio.sleep(check_interval)
+        elapsed_time += check_interval
+        
         status = await check_task_status(task_id)
         logger.info(f"[check] t={elapsed_time}s status={status}")
 
@@ -186,9 +190,6 @@ async def wait_for_task(task_id: int, max_wait_time: int = 300, check_interval: 
             return await get_task_result(task_id)
         elif status == "error":
             return None
-        else:
-            await asyncio.sleep(check_interval)
-            elapsed_time += check_interval
 
     logger.warning(f"Превышено время ожидания ({max_wait_time}s)")
     return None
@@ -453,7 +454,7 @@ if __name__ == "__main__":
         se_type=3,
         region=2,
         max_wait_time=300,
-        wait_per_query=5,
+        wait_per_query=10,
         is_snippet=False,
         urls_per_query=5
     ))
