@@ -438,7 +438,7 @@ if __name__ == "__main__":
     results = asyncio.run(get_top_results(
         queries=queries,
         se_type=3,
-        region=213,
+        region=2,
         max_wait_time=300,
         wait_per_query=5,
         is_snippet=False,

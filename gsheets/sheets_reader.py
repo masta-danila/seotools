@@ -141,6 +141,7 @@ def get_all_data_urls(worksheet, meta_status: Dict[str, bool]) -> Dict[str, Dict
         url_idx = headers.index('URL') if 'URL' in headers else headers.index('url')
         queries_idx = headers.index('Querries') if 'Querries' in headers else None
         company_idx = headers.index('Company name') if 'Company name' in headers else None
+        region_idx = headers.index('Region') if 'Region' in headers else None
         var_h1_idx = headers.index('Variables h1') if 'Variables h1' in headers else None
         var_title_idx = headers.index('Variables title') if 'Variables title' in headers else None
         var_desc_idx = headers.index('Variables description') if 'Variables description' in headers else None
@@ -164,6 +165,7 @@ def get_all_data_urls(worksheet, meta_status: Dict[str, bool]) -> Dict[str, Dict
             all_data[url] = {
                 "queries": [],
                 "company_name": set(),
+                "region": set(),
                 "variables_h1": [],
                 "variables_title": [],
                 "variables_description": []
@@ -182,6 +184,11 @@ def get_all_data_urls(worksheet, meta_status: Dict[str, bool]) -> Dict[str, Dict
         company_name = row[company_idx].strip() if company_idx and company_idx < len(row) else ""
         if company_name:
             all_data[url]["company_name"].add(company_name)
+        
+        # Получаем регион
+        region = row[region_idx].strip() if region_idx and region_idx < len(row) else ""
+        if region:
+            all_data[url]["region"].add(region)
         
         # Получаем переменные для h1 (могут быть разделены новой строкой)
         var_h1 = row[var_h1_idx].strip() if var_h1_idx and var_h1_idx < len(row) else ""
@@ -218,6 +225,19 @@ def get_all_data_urls(worksheet, meta_status: Dict[str, bool]) -> Dict[str, Dict
             # Преобразуем company_name из set в строку
             company_names = list(data["company_name"])
             data["company_name"] = company_names[0] if company_names else ""
+            
+            # Преобразуем region из set в int или строку
+            regions = list(data["region"])
+            if regions:
+                region_value = regions[0]
+                # Пытаемся преобразовать в int, если это число
+                try:
+                    data["region"] = int(region_value)
+                except ValueError:
+                    data["region"] = region_value
+            else:
+                data["region"] = None
+            
             result[url] = data
     
     return result
@@ -355,6 +375,7 @@ if __name__ == "__main__":
                 logger.info(f"URL: {first_url}")
                 logger.info(f"Запросы: {first_data.get('queries', [])}")
                 logger.info(f"Компания: {first_data.get('company_name', '')}")
+                logger.info(f"Регион: {first_data.get('region', None)}")
                 logger.info(f"Переменные h1: {first_data.get('variables_h1', [])}")
                 logger.info(f"Переменные title: {first_data.get('variables_title', [])}")
                 logger.info(f"Переменные description: {first_data.get('variables_description', [])}")

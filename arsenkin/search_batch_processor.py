@@ -22,7 +22,7 @@ async def process_url(
     url: str,
     url_data: Dict,
     se_type: int = 3,
-    region: int = 213,
+    default_region: int = 213,
     max_wait_time: int = 300,
     wait_per_query: int = 2,
     is_snippet: bool = False,
@@ -33,9 +33,9 @@ async def process_url(
     
     Args:
         url: URL страницы
-        url_data: Данные URL (queries, company_name, и т.д.)
+        url_data: Данные URL (queries, company_name, region и т.д.)
         se_type: Тип поисковой системы
-        region: ID региона
+        default_region: ID региона по умолчанию (если не указан в url_data)
         max_wait_time: Максимальное время ожидания
         wait_per_query: Множитель времени ожидания на запрос
         is_snippet: Получать ли сниппеты
@@ -50,7 +50,10 @@ async def process_url(
         logger.info(f"[SKIP] Пропущен {url}: нет запросов")
         return {**url_data, 'filtered_urls': []}
     
-    logger.info(f"[PROCESS] Обработка {url} ({len(queries)} запросов, топ-{urls_per_query} от каждого)...")
+    # Берём region из данных URL, если есть, иначе используем дефолтный
+    region = url_data.get('region', default_region)
+    
+    logger.info(f"[PROCESS] Обработка {url} ({len(queries)} запросов, топ-{urls_per_query} от каждого, регион: {region})...")
     
     try:
         result = await get_top_results(
@@ -81,7 +84,7 @@ async def process_url(
 async def process_sheets_data(
     sheets_data: Dict,
     se_type: int = 3,
-    region: int = 213,
+    default_region: int = 213,
     max_wait_time: int = 300,
     wait_per_query: int = 5,
     is_snippet: bool = False,
@@ -92,9 +95,9 @@ async def process_sheets_data(
     Обрабатывает все URL из sheets_data асинхронно
     
     Args:
-        sheets_data: Словарь с данными из Google Sheets
+        sheets_data: Словарь с данными из Google Sheets (каждый URL может иметь свой region)
         se_type: Тип поисковой системы
-        region: ID региона
+        default_region: ID региона по умолчанию (если не указан в данных URL)
         max_wait_time: Максимальное время ожидания
         wait_per_query: Множитель времени ожидания на запрос
         is_snippet: Получать ли сниппеты
@@ -115,7 +118,7 @@ async def process_sheets_data(
                 url=url,
                 url_data=url_data,
                 se_type=se_type,
-                region=region,
+                default_region=default_region,
                 max_wait_time=max_wait_time,
                 wait_per_query=wait_per_query,
                 is_snippet=is_snippet,
@@ -176,7 +179,7 @@ if __name__ == "__main__":
     results = asyncio.run(process_sheets_data(
         sheets_data=sheets_data,
         se_type=3,
-        region=213,
+        default_region=213,  # Регион по умолчанию, если не указан в данных URL
         max_wait_time=300,
         wait_per_query=10,
         is_snippet=False,

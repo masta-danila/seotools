@@ -57,7 +57,7 @@ async def run_full_pipeline():
     data = await process_sheets_data(
         sheets_data=data,
         se_type=3,
-        region=213,
+        default_region=213,  # Регион по умолчанию, если не указан в данных URL
         max_wait_time=600,
         wait_per_query=15,  # Увеличено с 10 до 15 для более редких проверок статуса
         is_snippet=False,
