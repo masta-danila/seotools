@@ -67,7 +67,8 @@ async def run_full_pipeline():
         wait_per_query=10,  # Оптимизировано: rate limiter контролирует запросы
         is_snippet=False,
         urls_per_query=5,
-        max_concurrent=5  # Увеличено с 2 до 5 для максимальной производительности
+        max_concurrent=5,  # Увеличено с 2 до 5 для максимальной производительности
+        task_start_delay=0.5  # Задержка между стартами задач для предотвращения 429
     )
     # save_step_results(data, "step2_search_results.json")
     

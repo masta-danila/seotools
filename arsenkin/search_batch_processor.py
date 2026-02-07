@@ -21,7 +21,7 @@ logger = get_search_logger()
 async def process_url(
     url: str,
     url_data: Dict,
-    se_type: int = 3,
+    se_type: int = 5,
     default_region: int = 213,
     max_wait_time: int = 300,
     wait_per_query: int = 2,
@@ -90,6 +90,7 @@ async def process_sheets_data(
     is_snippet: bool = False,
     urls_per_query: int = 5,
     max_concurrent: int = 3,
+    task_start_delay: float = 0.0,
 ) -> Dict:
     """
     Обрабатывает все URL из sheets_data асинхронно
@@ -103,6 +104,7 @@ async def process_sheets_data(
         is_snippet: Получать ли сниппеты
         urls_per_query: Количество URL для извлечения от каждого запроса
         max_concurrent: Максимальное количество одновременных запросов
+        task_start_delay: Задержка между стартами задач (в секундах) для предотвращения burst запросов
     
     Returns:
         Обновлённый словарь с добавленными filtered_urls для каждого URL
@@ -112,7 +114,11 @@ async def process_sheets_data(
     # Создаём семафор для ограничения одновременных запросов
     semaphore = asyncio.Semaphore(max_concurrent)
     
-    async def process_with_semaphore(spreadsheet_id: str, url: str, url_data: Dict):
+    async def process_with_semaphore(spreadsheet_id: str, url: str, url_data: Dict, task_index: int):
+        # Добавляем задержку перед стартом задачи (для предотвращения burst запросов)
+        if task_start_delay > 0 and task_index > 0:
+            await asyncio.sleep(task_start_delay * task_index)
+        
         async with semaphore:
             processed_url_data = await process_url(
                 url=url,
@@ -128,12 +134,17 @@ async def process_sheets_data(
     
     # Собираем все задачи
     tasks = []
+    task_index = 0
     for spreadsheet_id, spreadsheet_info in sheets_data.items():
         urls_dict = spreadsheet_info.get('urls', {})
         for url, url_data in urls_dict.items():
-            tasks.append(process_with_semaphore(spreadsheet_id, url, url_data))
+            tasks.append(process_with_semaphore(spreadsheet_id, url, url_data, task_index))
+            task_index += 1
     
-    logger.info(f"Запуск обработки {len(tasks)} URL (макс. {max_concurrent} одновременно)")
+    if task_start_delay > 0:
+        logger.info(f"Запуск обработки {len(tasks)} URL (макс. {max_concurrent} одновременно, задержка между стартами: {task_start_delay}s)")
+    else:
+        logger.info(f"Запуск обработки {len(tasks)} URL (макс. {max_concurrent} одновременно)")
     
     # Выполняем все задачи
     results = await asyncio.gather(*tasks)
@@ -184,7 +195,8 @@ if __name__ == "__main__":
         wait_per_query=10,
         is_snippet=False,
         urls_per_query=5,  # Берем топ-5 URL от каждого запроса
-        max_concurrent=3
+        max_concurrent=5,
+        task_start_delay=0.5  # Задержка между стартами задач для предотвращения 429
     ))
     
     # Сохраняем
