@@ -97,11 +97,15 @@ async def create_task(
         task_id = data.get("task_id")
         if task_id:
             return task_id
+        
+        logger.warning(f"[WARN] create_task: нет task_id в ответе API. Ответ: {data}")
         return None
 
-    except httpx.RequestError:
+    except httpx.RequestError as e:
+        logger.error(f"[ERROR] create_task: ошибка HTTP запроса - {e}")
         return None
-    except Exception:
+    except Exception as e:
+        logger.error(f"[ERROR] create_task: неожиданная ошибка - {e}")
         return None
 
 
