@@ -59,6 +59,7 @@ async def create_task(
     depth: int = 10,
     is_snippet: bool = False,
     noreask: bool = False,
+    max_retries: int = 3,
 ) -> Optional[int]:
     """
     Создаёт задачу на получение выдачи (инструмент check-top).
@@ -71,6 +72,9 @@ async def create_task(
       12 = Google Mobile
       20 = YouTube Desktop
       21 = YouTube Mobile
+    
+    Args:
+        max_retries: Максимальное количество повторных попыток при 429 ошибке
     """
     payload = {
         "tools_name": "check-top",
@@ -85,28 +89,43 @@ async def create_task(
         },
     }
 
-    try:
-        # Ждём разрешения от rate limiter
-        await _rate_limiter.acquire()
-        
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(API_SET_URL, headers=get_headers(), json=payload)
-        response.raise_for_status()
+    for attempt in range(max_retries):
+        try:
+            # Ждём разрешения от rate limiter
+            await _rate_limiter.acquire()
+            
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.post(API_SET_URL, headers=get_headers(), json=payload)
+            
+            # Обработка 429 (Too Many Requests)
+            if response.status_code == 429:
+                wait_time = 60 * (attempt + 1)  # 60, 120, 180 секунд
+                logger.warning(f"[WARN] Rate limit (429). Попытка {attempt + 1}/{max_retries}. Ожидание {wait_time} сек...")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(wait_time)
+                    continue
+                else:
+                    logger.error(f"[ERROR] Превышено максимальное количество попыток при rate limit")
+                    return None
+            
+            response.raise_for_status()
 
-        data = response.json()
-        task_id = data.get("task_id")
-        if task_id:
-            return task_id
-        
-        logger.warning(f"[WARN] create_task: нет task_id в ответе API. Ответ: {data}")
-        return None
+            data = response.json()
+            task_id = data.get("task_id")
+            if task_id:
+                return task_id
+            
+            logger.warning(f"[WARN] create_task: нет task_id в ответе API. Ответ: {data}")
+            return None
 
-    except httpx.RequestError as e:
-        logger.error(f"[ERROR] create_task: ошибка HTTP запроса - {e}")
-        return None
-    except Exception as e:
-        logger.error(f"[ERROR] create_task: неожиданная ошибка - {e}")
-        return None
+        except httpx.RequestError as e:
+            logger.error(f"[ERROR] create_task: ошибка HTTP запроса - {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[ERROR] create_task: неожиданная ошибка - {e}")
+            return None
+    
+    return None
 
 
 async def check_task_status(task_id: int) -> Optional[str]:
