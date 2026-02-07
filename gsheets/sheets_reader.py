@@ -1,7 +1,12 @@
 """
 Модуль для чтения данных из Google Sheets
-Читает таблицы, находит URL с незаполненными метатегами на листе "Meta"
-и собирает вводные данные с листа "Data"
+
+Логика работы:
+1. Получает статус всех URL из листа "Meta" (заполнены все поля или нет)
+2. Собирает все URL из листа "Data" и фильтрует те, которые:
+   - отсутствуют в Meta, ИЛИ
+   - присутствуют в Meta, но имеют незаполненные поля (h1, title, description)
+3. Возвращает вводные данные для отфильтрованных URL
 """
 import json
 import os
@@ -59,21 +64,21 @@ def load_spreadsheet_ids() -> List[str]:
     return spreadsheet_ids
 
 
-def get_urls_with_empty_meta(worksheet) -> Dict[str, Dict[str, bool]]:
+def get_meta_urls_status(worksheet) -> Dict[str, bool]:
     """
-    Находит URL с незаполненными метатегами (h1, title или description)
+    Получает статус заполненности метатегов для всех URL на листе Meta
     
     Args:
-        worksheet: Лист Google Sheets
+        worksheet: Лист "Meta"
     
     Returns:
-        Dict[str, Dict[str, bool]]: Словарь {url: {"h1": True/False, "title": True/False, "description": True/False}}
+        Dict[str, bool]: Словарь {url: True/False}, где True = все поля заполнены, False = есть пустые поля
     """
     # Получаем все данные листа
     all_values = worksheet.get_all_values()
     
     if not all_values:
-        return []
+        return {}
     
     # Первая строка - заголовки
     headers = all_values[0]
@@ -85,35 +90,39 @@ def get_urls_with_empty_meta(worksheet) -> Dict[str, Dict[str, bool]]:
         title_idx = headers.index('title') if 'title' in headers else headers.index('Title')
         desc_idx = headers.index('description') if 'description' in headers else headers.index('Description')
     except ValueError as e:
-        logger.error(f"Не найдена обязательная колонка: {e}")
-        return []
+        logger.error(f"Не найдена обязательная колонка в Meta: {e}")
+        return {}
     
-    # Собираем URL с незаполненными метатегами
-    urls_with_empty_meta = []
+    # Собираем статус для каждого URL
+    meta_status = {}
     
     for row in all_values[1:]:  # Пропускаем заголовок
-        if len(row) <= max(url_idx, h1_idx, title_idx, desc_idx):
+        if len(row) <= url_idx:
             continue
         
         url = row[url_idx].strip() if url_idx < len(row) else ""
+        if not url:
+            continue
+            
         h1 = row[h1_idx].strip() if h1_idx < len(row) else ""
         title = row[title_idx].strip() if title_idx < len(row) else ""
         description = row[desc_idx].strip() if desc_idx < len(row) else ""
         
-        # Если хотя бы одно поле пустое и есть URL
-        if url and (not h1 or not title or not description):
-            urls_with_empty_meta.append(url)
+        # True если все поля заполнены, False если хотя бы одно пустое
+        meta_status[url] = bool(h1 and title and description)
     
-    return urls_with_empty_meta
+    return meta_status
 
 
-def get_input_data_for_urls(worksheet, urls_list: List[str]) -> Dict[str, Dict]:
+def get_all_data_urls(worksheet, meta_status: Dict[str, bool]) -> Dict[str, Dict]:
     """
-    Получает вводные данные для URL с листа "Data"
+    Получает вводные данные для всех URL с листа "Data", которые:
+    - отсутствуют в Meta, ИЛИ
+    - присутствуют в Meta, но имеют незаполненные поля
     
     Args:
         worksheet: Лист "Data"
-        urls_list: Список URL для обработки
+        meta_status: Словарь {url: True/False} со статусом заполненности Meta
     
     Returns:
         Dict[str, Dict]: Словарь {url: {данные}}
@@ -136,76 +145,80 @@ def get_input_data_for_urls(worksheet, urls_list: List[str]) -> Dict[str, Dict]:
         var_title_idx = headers.index('Variables title') if 'Variables title' in headers else None
         var_desc_idx = headers.index('Variables description') if 'Variables description' in headers else None
     except ValueError as e:
-        logger.error(f"Не найдена колонка URL: {e}")
+        logger.error(f"Не найдена колонка URL в Data: {e}")
         return {}
     
     # Собираем данные для каждого URL (URL может быть в нескольких строках)
-    result = {}
+    all_data = {}
     
     for row in all_values[1:]:  # Пропускаем заголовок
         if len(row) <= url_idx:
             continue
         
         url = row[url_idx].strip()
+        if not url:
+            continue
         
-        # Если этот URL в списке нужных
-        if url in urls_list:
-            # Инициализируем словарь для URL если его еще нет
-            if url not in result:
-                result[url] = {
-                    "queries": [],
-                    "company_name": set(),
-                    "variables_h1": [],
-                    "variables_title": [],
-                    "variables_description": []
-                }
-            
-            # Получаем запросы (могут быть разделены новой строкой)
-            queries = row[queries_idx].strip() if queries_idx and queries_idx < len(row) else ""
-            queries_list = [q.strip() for q in queries.split('\n') if q.strip()] if queries else []
-            
-            # Добавляем уникальные запросы
-            for q in queries_list:
-                if q and q not in result[url]["queries"]:
-                    result[url]["queries"].append(q)
-            
-            # Получаем название компании
-            company_name = row[company_idx].strip() if company_idx and company_idx < len(row) else ""
-            if company_name:
-                result[url]["company_name"].add(company_name)
-            
-            # Получаем переменные для h1 (могут быть разделены новой строкой)
-            var_h1 = row[var_h1_idx].strip() if var_h1_idx and var_h1_idx < len(row) else ""
-            var_h1_list = [v.strip() for v in var_h1.split('\n') if v.strip()] if var_h1 else []
-            
-            # Добавляем уникальные переменные h1
-            for v in var_h1_list:
-                if v and v not in result[url]["variables_h1"]:
-                    result[url]["variables_h1"].append(v)
-            
-            # Получаем переменные для title (могут быть разделены новой строкой)
-            var_title = row[var_title_idx].strip() if var_title_idx and var_title_idx < len(row) else ""
-            var_title_list = [v.strip() for v in var_title.split('\n') if v.strip()] if var_title else []
-            
-            # Добавляем уникальные переменные title
-            for v in var_title_list:
-                if v and v not in result[url]["variables_title"]:
-                    result[url]["variables_title"].append(v)
-            
-            # Получаем переменные для description (могут быть разделены новой строкой)
-            var_desc = row[var_desc_idx].strip() if var_desc_idx and var_desc_idx < len(row) else ""
-            var_desc_list = [v.strip() for v in var_desc.split('\n') if v.strip()] if var_desc else []
-            
-            # Добавляем уникальные переменные description
-            for v in var_desc_list:
-                if v and v not in result[url]["variables_description"]:
-                    result[url]["variables_description"].append(v)
+        # Инициализируем словарь для URL если его еще нет
+        if url not in all_data:
+            all_data[url] = {
+                "queries": [],
+                "company_name": set(),
+                "variables_h1": [],
+                "variables_title": [],
+                "variables_description": []
+            }
+        
+        # Получаем запросы (могут быть разделены новой строкой)
+        queries = row[queries_idx].strip() if queries_idx and queries_idx < len(row) else ""
+        queries_list = [q.strip() for q in queries.split('\n') if q.strip()] if queries else []
+        
+        # Добавляем уникальные запросы
+        for q in queries_list:
+            if q and q not in all_data[url]["queries"]:
+                all_data[url]["queries"].append(q)
+        
+        # Получаем название компании
+        company_name = row[company_idx].strip() if company_idx and company_idx < len(row) else ""
+        if company_name:
+            all_data[url]["company_name"].add(company_name)
+        
+        # Получаем переменные для h1 (могут быть разделены новой строкой)
+        var_h1 = row[var_h1_idx].strip() if var_h1_idx and var_h1_idx < len(row) else ""
+        var_h1_list = [v.strip() for v in var_h1.split('\n') if v.strip()] if var_h1 else []
+        
+        # Добавляем уникальные переменные h1
+        for v in var_h1_list:
+            if v and v not in all_data[url]["variables_h1"]:
+                all_data[url]["variables_h1"].append(v)
+        
+        # Получаем переменные для title (могут быть разделены новой строкой)
+        var_title = row[var_title_idx].strip() if var_title_idx and var_title_idx < len(row) else ""
+        var_title_list = [v.strip() for v in var_title.split('\n') if v.strip()] if var_title else []
+        
+        # Добавляем уникальные переменные title
+        for v in var_title_list:
+            if v and v not in all_data[url]["variables_title"]:
+                all_data[url]["variables_title"].append(v)
+        
+        # Получаем переменные для description (могут быть разделены новой строкой)
+        var_desc = row[var_desc_idx].strip() if var_desc_idx and var_desc_idx < len(row) else ""
+        var_desc_list = [v.strip() for v in var_desc.split('\n') if v.strip()] if var_desc else []
+        
+        # Добавляем уникальные переменные description
+        for v in var_desc_list:
+            if v and v not in all_data[url]["variables_description"]:
+                all_data[url]["variables_description"].append(v)
     
-    # Преобразуем company_name из set в строку и добавляем статус метатегов
-    for url in result:
-        company_names = list(result[url]["company_name"])
-        # Если несколько названий компании, берем первое непустое
-        result[url]["company_name"] = company_names[0] if company_names else ""
+    # Фильтруем URL: берем только те, которых нет в Meta или они есть но не полностью заполнены
+    result = {}
+    for url, data in all_data.items():
+        # URL отсутствует в Meta (не в словаре) ИЛИ присутствует но не все поля заполнены (False)
+        if url not in meta_status or not meta_status[url]:
+            # Преобразуем company_name из set в строку
+            company_names = list(data["company_name"])
+            data["company_name"] = company_names[0] if company_names else ""
+            result[url] = data
     
     return result
 
@@ -213,6 +226,12 @@ def get_input_data_for_urls(worksheet, urls_list: List[str]) -> Dict[str, Dict]:
 def process_all_spreadsheets() -> Dict:
     """
     Обрабатывает все таблицы из spreadsheets.json
+    
+    Логика:
+    - Получает статус всех URL из листа "Meta"
+    - Берет все URL из листа "Data", которые:
+      * отсутствуют в Meta, ИЛИ
+      * присутствуют в Meta, но имеют незаполненные поля (h1, title, description)
     
     Returns:
         Dict: Словарь с данными для всех таблиц
@@ -235,19 +254,14 @@ def process_all_spreadsheets() -> Dict:
             logger.info(f"✓ Таблица открыта: {spreadsheet.title}")
             
             # Получаем лист "Meta"
+            meta_status = {}
             try:
                 meta_sheet = spreadsheet.worksheet("Meta")
+                # Получаем статус заполненности для всех URL в Meta
+                meta_status = get_meta_urls_status(meta_sheet)
+                logger.info(f"  Найдено URL в Meta: {len(meta_status)}")
             except gspread.exceptions.WorksheetNotFound:
-                logger.warning(f"  ✗ Лист 'Meta' не найден")
-                continue
-            
-            # Находим URL с незаполненными метатегами
-            urls_list = get_urls_with_empty_meta(meta_sheet)
-            logger.info(f"  Найдено URL с незаполненными метатегами: {len(urls_list)}")
-            
-            if not urls_list:
-                logger.info(f"  ✓ Все метатеги заполнены")
-                continue
+                logger.warning(f"  ✗ Лист 'Meta' не найден, будут обработаны все URL из Data")
             
             # Получаем лист "Data"
             try:
@@ -256,9 +270,20 @@ def process_all_spreadsheets() -> Dict:
                 logger.warning(f"  ✗ Лист 'Data' не найден")
                 continue
             
-            # Получаем вводные данные для URL
-            input_data = get_input_data_for_urls(input_sheet, urls_list)
-            logger.info(f"  Получено данных для URL: {len(input_data)}")
+            # Получаем данные для всех URL из Data, фильтруя по статусу Meta
+            input_data = get_all_data_urls(input_sheet, meta_status)
+            
+            # Считаем сколько URL отсутствуют в Meta и сколько с незаполненными полями
+            missing_in_meta = sum(1 for url in input_data.keys() if url not in meta_status)
+            incomplete_in_meta = sum(1 for url in input_data.keys() if url in meta_status and not meta_status[url])
+            
+            logger.info(f"  URL для обработки: {len(input_data)}")
+            logger.info(f"    - отсутствуют в Meta: {missing_in_meta}")
+            logger.info(f"    - есть в Meta, но не заполнены: {incomplete_in_meta}")
+            
+            if not input_data:
+                logger.info(f"  ✓ Нет URL для обработки")
+                continue
             
             # Сохраняем данные для этой таблицы
             all_data[spreadsheet_id] = {
