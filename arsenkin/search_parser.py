@@ -16,8 +16,12 @@ import httpx
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from logger_config import get_search_logger
+from rate_limiter import get_rate_limiter
 
 logger = get_search_logger()
+
+# Получаем глобальный rate limiter
+_rate_limiter = get_rate_limiter()
 
 # Загружаем переменные окружения из корня проекта
 load_dotenv()
@@ -82,6 +86,9 @@ async def create_task(
     }
 
     try:
+        # Ждём разрешения от rate limiter
+        await _rate_limiter.acquire()
+        
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(API_SET_URL, headers=get_headers(), json=payload)
         response.raise_for_status()
@@ -111,6 +118,9 @@ async def check_task_status(task_id: int) -> Optional[str]:
     payload = {"task_id": task_id}
     
     try:
+        # Ждём разрешения от rate limiter
+        await _rate_limiter.acquire()
+        
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(API_CHECK_URL, headers=get_headers(), json=payload)
         response.raise_for_status()
@@ -136,6 +146,9 @@ async def get_task_result(task_id: int) -> Optional[Dict]:
     payload = {"task_id": task_id}
     
     try:
+        # Ждём разрешения от rate limiter
+        await _rate_limiter.acquire()
+        
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(API_GET_URL, headers=get_headers(), json=payload)
         response.raise_for_status()

@@ -31,7 +31,12 @@ from metagenerator_batch import generate_metatags_batch  # type: ignore
 from sheets_updater import update_all_spreadsheets  # type: ignore
 from logger_config import get_pipeline_logger
 
+# Импортируем rate limiter для мониторинга
+sys.path.insert(0, str(project_root / "arsenkin"))
+from rate_limiter import get_rate_limiter  # type: ignore
+
 logger = get_pipeline_logger()
+_rate_limiter = get_rate_limiter()
 
 
 def save_step_results(data, filename: str):
@@ -59,17 +64,21 @@ async def run_full_pipeline():
         se_type=3,
         default_region=213,  # Регион по умолчанию, если не указан в данных URL
         max_wait_time=600,
-        wait_per_query=15,  # Увеличено с 10 до 15 для более редких проверок статуса
+        wait_per_query=10,  # Оптимизировано: rate limiter контролирует запросы
         is_snippet=False,
         urls_per_query=5,
-        max_concurrent=2  # Уменьшено с 3 до 2 для соблюдения лимита 30 запросов/мин
+        max_concurrent=5  # Увеличено с 2 до 5 для максимальной производительности
     )
     # save_step_results(data, "step2_search_results.json")
     
-    # Пауза между шагами для соблюдения rate limit Arsenkin API (30 запросов/мин)
-    # Увеличенная пауза гарантирует, что запросы с шага 2 вышли из скользящего окна
-    logger.info("⏳ Пауза 120 сек для соблюдения rate limit API (30 запросов/мин)...")
-    await asyncio.sleep(120)
+    # Логирование статистики rate limiter после шага 2
+    stats = _rate_limiter.get_stats()
+    logger.info(f"📊 Статистика Rate Limiter (Шаг 2):")
+    logger.info(f"  Всего запросов: {stats['total_requests']}")
+    logger.info(f"  Всего ожиданий: {stats['total_waits']}")
+    logger.info(f"  Общее время ожидания: {stats['total_wait_time']}s")
+    logger.info(f"  Среднее время ожидания: {stats['avg_wait_time']}s")
+    logger.info(f"  Активных запросов в окне: {stats['active_requests']}/{stats['max_requests']}")
     
     # Шаг 3: Получение метатегов
     logger.info("ШАГ 3/6: Получение метатегов страниц")
@@ -85,9 +94,18 @@ async def run_full_pipeline():
         batch_data=data,
         foreign=False,
         max_wait_time=300,
-        wait_per_url=3  # Увеличено с 2 до 3 для более редких проверок статуса
+        wait_per_url=2  # Оптимизировано: rate limiter контролирует запросы
     )
     # save_step_results(data, "step3_parsed_metatags.json")
+    
+    # Логирование статистики rate limiter после шага 3
+    stats = _rate_limiter.get_stats()
+    logger.info(f"📊 Статистика Rate Limiter (Шаг 3):")
+    logger.info(f"  Всего запросов: {stats['total_requests']}")
+    logger.info(f"  Всего ожиданий: {stats['total_waits']}")
+    logger.info(f"  Общее время ожидания: {stats['total_wait_time']}s")
+    logger.info(f"  Среднее время ожидания: {stats['avg_wait_time']}s")
+    logger.info(f"  Активных запросов в окне: {stats['active_requests']}/{stats['max_requests']}")
     
     # Шаг 4: Лемматизация
     logger.info("ШАГ 4/6: Лемматизация текстов")
