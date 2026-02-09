@@ -29,5 +29,5 @@ Thumbs.db
 logs/
 *.log
 
-# Test results (optional - можно коммитить для примеров)
-# jsontests/*.json
+# Test results
+jsontests/
