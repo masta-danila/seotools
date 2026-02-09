@@ -69,3 +69,12 @@ def get_metagenerator_logger():
 
 def get_sheets_updater_logger():
     return setup_logger('sheets_updater', 'logs/sheets_updater.log')
+
+def get_html_parser_logger():
+    return setup_logger('html_parser', 'logs/html_parser.log')
+
+def get_meta_extractor_logger():
+    return setup_logger('meta_extractor', 'logs/meta_extractor.log')
+
+def get_batch_meta_logger():
+    return setup_logger('batch_meta', 'logs/batch_meta.log')
