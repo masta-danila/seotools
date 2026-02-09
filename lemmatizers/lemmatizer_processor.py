@@ -55,10 +55,14 @@ def process_urls_with_lemmatization(
             descriptions = []
             
             for item in filtered_urls:
-                if 'title' in item and item['title']:
-                    titles.append(item['title'])
-                if 'description' in item and item['description']:
-                    descriptions.append(item['description'])
+                # Проверяем, является ли item словарем с метаданными
+                if isinstance(item, dict) and 'meta' in item:
+                    meta = item['meta']
+                    if meta:
+                        if 'title' in meta and meta['title']:
+                            titles.append(meta['title'])
+                        if 'description' in meta and meta['description']:
+                            descriptions.append(meta['description'])
             
             # Лемматизируем
             lemmatized_title_words = find_common_words(
@@ -106,7 +110,7 @@ if __name__ == "__main__":
     """
     # Определяем пути относительно корня проекта
     project_root = Path(__file__).parent.parent
-    input_file = project_root / "jsontests" / "arsenkin_h_results.json"
+    input_file = project_root / "jsontests" / "step3_parsed_metatags.json"
     output_file = project_root / "jsontests" / "lemmatizer_processor_results.json"
     
     # Загружаем данные

@@ -44,26 +44,47 @@ def get_sheets_client():
     return client
 
 
-def find_url_row(worksheet, url: str) -> int:
+def get_meta_sheet_data(worksheet) -> tuple:
     """
-    Находит номер строки с указанным URL
+    Загружает все данные из листа Meta
     
     Args:
         worksheet: Лист Google Sheets
-        url: URL для поиска
         
     Returns:
-        Номер строки (1-based) или None если не найдено
+        Tuple: (headers, all_rows, url_to_row_mapping)
+            - headers: список заголовков
+            - all_rows: список всех строк (list of lists)
+            - url_to_row_mapping: словарь {url: row_number}
     """
     try:
-        # Получаем все значения из первой колонки (предполагаем, что URL в колонке A)
-        cell = worksheet.find(url)
-        if cell:
-            return cell.row
-        return None
+        # Получаем все данные листа сразу (быстрее чем построчно)
+        all_values = worksheet.get_all_values()
+        
+        if not all_values:
+            return [], [], {}
+        
+        headers = all_values[0]  # Первая строка - заголовки
+        data_rows = all_values[1:]  # Остальные строки - данные
+        
+        # Находим индекс колонки URL
+        try:
+            url_col_idx = headers.index('URL') if 'URL' in headers else headers.index('url')
+        except ValueError:
+            logger.error("[ОШИБКА] Колонка URL не найдена в заголовках")
+            return headers, data_rows, {}
+        
+        # Создаем маппинг URL -> номер строки (1-based, +2 т.к. пропускаем заголовок и начинаем с 1)
+        url_to_row = {}
+        for i, row in enumerate(data_rows, start=2):  # Начинаем со 2, т.к. 1 - заголовки
+            if len(row) > url_col_idx and row[url_col_idx]:
+                url_to_row[row[url_col_idx]] = i
+        
+        return headers, data_rows, url_to_row
+        
     except Exception as e:
-        print(f"[ОШИБКА] Поиск URL {url}: {str(e)}")
-        return None
+        logger.error(f"[ОШИБКА] Загрузка данных листа: {str(e)}")
+        return [], [], {}
 
 
 def update_spreadsheet_metatags(
@@ -74,6 +95,8 @@ def update_spreadsheet_metatags(
 ) -> Dict:
     """
     Обновляет метатеги в Google Таблице для всех URL (батчевое обновление)
+    - Если URL есть в таблице - дозаполняет пустые поля
+    - Если URL нет в таблице - создает новую строку
     
     Args:
         client: Авторизованный клиент gspread
@@ -87,6 +110,7 @@ def update_spreadsheet_metatags(
     stats = {
         "processed": 0,
         "updated": 0,
+        "created": 0,
         "skipped": 0,
         "errors": 0,
         "details": []
@@ -106,15 +130,20 @@ def update_spreadsheet_metatags(
             stats["errors"] += len(urls_data)
             return stats
         
-        # Получаем заголовки (первая строка)
-        headers = worksheet.row_values(1)
+        # Загружаем все данные листа
+        headers, data_rows, url_to_row = get_meta_sheet_data(worksheet)
         
-        # Находим индексы нужных колонок (гибкий поиск)
+        if not headers:
+            logger.error(f"[ОШИБКА] Не удалось загрузить данные листа")
+            stats["errors"] += len(urls_data)
+            return stats
+        
+        # Находим индексы нужных колонок
         try:
-            url_col_idx = (headers.index('URL') if 'URL' in headers else headers.index('url')) + 1
-            h1_col_idx = (headers.index('h1') if 'h1' in headers else headers.index('H1')) + 1
-            title_col_idx = (headers.index('title') if 'title' in headers else headers.index('Title')) + 1
-            description_col_idx = (headers.index('description') if 'description' in headers else headers.index('Description')) + 1
+            url_col_idx = headers.index('URL') if 'URL' in headers else headers.index('url')
+            h1_col_idx = headers.index('h1') if 'h1' in headers else headers.index('H1')
+            title_col_idx = headers.index('title') if 'title' in headers else headers.index('Title')
+            description_col_idx = headers.index('description') if 'description' in headers else headers.index('Description')
         except ValueError as e:
             logger.error(f"[ОШИБКА] Не найдена необходимая колонка: {e}")
             logger.error(f"[DEBUG] Доступные колонки: {headers}")
@@ -122,25 +151,15 @@ def update_spreadsheet_metatags(
             return stats
         
         logger.info(f"[INFO] Найдены колонки: URL={url_col_idx}, H1={h1_col_idx}, Title={title_col_idx}, Description={description_col_idx}")
+        logger.info(f"[INFO] В листе Meta найдено {len(url_to_row)} URL")
         
-        # Собираем все обновления в один батч
+        # Собираем все обновления и вставки в один батч
         batch_updates = []
+        rows_to_append = []
         
         # Обрабатываем каждый URL
         for url, url_info in urls_data.items():
             stats["processed"] += 1
-            
-            # Находим строку с этим URL
-            row_num = find_url_row(worksheet, url)
-            
-            if row_num is None:
-                logger.warning(f"[ПРОПУСК] URL не найден в таблице: {url}")
-                stats["skipped"] += 1
-                stats["details"].append({
-                    "url": url,
-                    "status": "not_found"
-                })
-                continue
             
             # Проверяем, есть ли сгенерированные метатеги
             generated = url_info.get("generated_metatags")
@@ -149,72 +168,111 @@ def update_spreadsheet_metatags(
                 stats["skipped"] += 1
                 stats["details"].append({
                     "url": url,
-                    "status": "no_generated_data",
-                    "row": row_num
+                    "status": "no_generated_data"
                 })
                 continue
             
-            # Читаем текущие значения из таблицы
-            current_h1 = worksheet.cell(row_num, h1_col_idx).value
-            current_title = worksheet.cell(row_num, title_col_idx).value
-            current_description = worksheet.cell(row_num, description_col_idx).value
-            
-            # Подготавливаем обновления только для пустых полей
-            url_updates = []
-            
-            # H1 - заполняем если пусто
-            if not current_h1 and generated.get("h1"):
-                url_updates.append({
-                    "range": f"{chr(64 + h1_col_idx)}{row_num}",
-                    "values": [[generated["h1"]]]
-                })
-            
-            # Title - заполняем если пусто
-            if not current_title and generated.get("title"):
-                url_updates.append({
-                    "range": f"{chr(64 + title_col_idx)}{row_num}",
-                    "values": [[generated["title"]]]
-                })
-            
-            # Description - заполняем если пусто
-            if not current_description and generated.get("description"):
-                url_updates.append({
-                    "range": f"{chr(64 + description_col_idx)}{row_num}",
-                    "values": [[generated["description"]]]
-                })
-            
-            # Добавляем обновления в общий батч
-            if url_updates:
-                batch_updates.extend(url_updates)
-                logger.info(f"[ПОДГОТОВКА] Добавлено {len(url_updates)} полей для: {url} (строка {row_num})")
-                stats["updated"] += 1
-                stats["details"].append({
-                    "url": url,
-                    "status": "prepared",
-                    "row": row_num,
-                    "fields_updated": len(url_updates)
-                })
+            # Проверяем, есть ли URL в таблице
+            if url in url_to_row:
+                # URL существует - обновляем пустые поля
+                row_num = url_to_row[url]
+                row_data = data_rows[row_num - 2]  # -2 т.к. data_rows начинается с 0, а row_num с 2
+                
+                # Читаем текущие значения
+                current_h1 = row_data[h1_col_idx] if len(row_data) > h1_col_idx else ""
+                current_title = row_data[title_col_idx] if len(row_data) > title_col_idx else ""
+                current_description = row_data[description_col_idx] if len(row_data) > description_col_idx else ""
+                
+                # Подготавливаем обновления только для пустых полей
+                url_updates = []
+                
+                # H1 - заполняем если пусто
+                if not current_h1 and generated.get("h1"):
+                    col_letter = chr(65 + h1_col_idx)  # 65 = 'A'
+                    url_updates.append({
+                        "range": f"{col_letter}{row_num}",
+                        "values": [[generated["h1"]]]
+                    })
+                
+                # Title - заполняем если пусто
+                if not current_title and generated.get("title"):
+                    col_letter = chr(65 + title_col_idx)
+                    url_updates.append({
+                        "range": f"{col_letter}{row_num}",
+                        "values": [[generated["title"]]]
+                    })
+                
+                # Description - заполняем если пусто
+                if not current_description and generated.get("description"):
+                    col_letter = chr(65 + description_col_idx)
+                    url_updates.append({
+                        "range": f"{col_letter}{row_num}",
+                        "values": [[generated["description"]]]
+                    })
+                
+                # Добавляем обновления в общий батч
+                if url_updates:
+                    batch_updates.extend(url_updates)
+                    logger.info(f"[ОБНОВЛЕНИЕ] {len(url_updates)} полей для: {url} (строка {row_num})")
+                    stats["updated"] += 1
+                    stats["details"].append({
+                        "url": url,
+                        "status": "updated",
+                        "row": row_num,
+                        "fields_updated": len(url_updates)
+                    })
+                else:
+                    logger.info(f"[ПРОПУСК] Все поля уже заполнены для: {url} (строка {row_num})")
+                    stats["skipped"] += 1
+                    stats["details"].append({
+                        "url": url,
+                        "status": "already_filled",
+                        "row": row_num
+                    })
             else:
-                logger.info(f"[ПРОПУСК] Все поля уже заполнены для: {url} (строка {row_num})")
-                stats["skipped"] += 1
+                # URL не существует - создаем новую строку
+                # Создаем строку с нужным количеством колонок
+                new_row = [""] * len(headers)
+                new_row[url_col_idx] = url
+                new_row[h1_col_idx] = generated.get("h1", "")
+                new_row[title_col_idx] = generated.get("title", "")
+                new_row[description_col_idx] = generated.get("description", "")
+                
+                rows_to_append.append(new_row)
+                logger.info(f"[СОЗДАНИЕ] Новая строка для: {url}")
+                stats["created"] += 1
                 stats["details"].append({
                     "url": url,
-                    "status": "already_filled",
-                    "row": row_num
+                    "status": "created"
                 })
         
         # Применяем все обновления одним батчем
         if batch_updates:
             try:
-                logger.info(f"[BATCH] Применение {len(batch_updates)} обновлений одним запросом...")
+                logger.info(f"[BATCH UPDATE] Применение {len(batch_updates)} обновлений...")
                 worksheet.batch_update(batch_updates)
-                logger.info(f"[OK] Батчевое обновление выполнено успешно")
+                logger.info(f"[OK] Обновления применены успешно")
             except Exception as e:
                 logger.error(f"[ОШИБКА] Батчевое обновление: {str(e)}")
                 stats["errors"] += len(batch_updates)
                 # Помечаем все подготовленные URL как ошибочные
                 for detail in stats["details"]:
-                    if detail.get("status") == "prepared":
+                    if detail.get("status") == "updated":
+                        detail["status"] = "error"
+                        detail["error"] = str(e)
+        
+        # Добавляем новые строки одним батчем
+        if rows_to_append:
+            try:
+                logger.info(f"[BATCH APPEND] Добавление {len(rows_to_append)} новых строк...")
+                worksheet.append_rows(rows_to_append)
+                logger.info(f"[OK] Новые строки добавлены успешно")
+            except Exception as e:
+                logger.error(f"[ОШИБКА] Добавление строк: {str(e)}")
+                stats["errors"] += len(rows_to_append)
+                # Помечаем все созданные URL как ошибочные
+                for detail in stats["details"]:
+                    if detail.get("status") == "created":
                         detail["status"] = "error"
                         detail["error"] = str(e)
         
@@ -252,6 +310,7 @@ def update_all_spreadsheets(
         "spreadsheets_failed": 0,
         "total_urls_processed": 0,
         "total_urls_updated": 0,
+        "total_urls_created": 0,
         "total_urls_skipped": 0,
         "total_errors": 0,
         "by_spreadsheet": {}
@@ -281,6 +340,7 @@ def update_all_spreadsheets(
         # Обновляем общую статистику
         total_stats["total_urls_processed"] += stats["processed"]
         total_stats["total_urls_updated"] += stats["updated"]
+        total_stats["total_urls_created"] += stats["created"]
         total_stats["total_urls_skipped"] += stats["skipped"]
         total_stats["total_errors"] += stats["errors"]
         total_stats["by_spreadsheet"][spreadsheet_id] = stats
@@ -297,6 +357,7 @@ def update_all_spreadsheets(
     logger.info(f"Таблиц с ошибками: {total_stats['spreadsheets_failed']}")
     logger.info(f"URL обработано: {total_stats['total_urls_processed']}")
     logger.info(f"URL обновлено: {total_stats['total_urls_updated']}")
+    logger.info(f"URL создано: {total_stats['total_urls_created']}")
     logger.info(f"URL пропущено: {total_stats['total_urls_skipped']}")
     logger.info(f"Ошибок: {total_stats['total_errors']}")
     

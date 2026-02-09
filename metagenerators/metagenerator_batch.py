@@ -244,7 +244,7 @@ if __name__ == "__main__":
     async def test():
         # Определяем пути относительно корня проекта
         project_root = Path(__file__).parent.parent
-        input_file = project_root / "jsontests" / "lemmatizer_processor_results.json"
+        input_file = project_root / "jsontests" / "step4_lemmatized.json"
         output_file = project_root / "jsontests" / "metagenerator_batch_results.json"
         
         # Загружаем данные

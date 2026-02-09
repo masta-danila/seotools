@@ -49,6 +49,8 @@ async def generate_seo_texts(
         f"- основной запрос: {main_query}",
         "- основной запрос используем ближе к началу в h1, title, description",
         "- h1 должен быть кратким и емким (2-5 слов)",
+        "- в h1 название компании использовать не нужно",
+        "- в h1 и title нельзя дублировать слова (каждое слово используется только один раз)",
     ]
     
     # Добавляем переменные для h1 только если они есть
@@ -152,7 +154,7 @@ if __name__ == "__main__":
         try:
             # Определяем пути относительно корня проекта
             project_root = Path(__file__).parent.parent
-            input_file = project_root / "jsontests" / "lemmatizer_processor_results.json"
+            input_file = project_root / "jsontests" / "step4_lemmatized.json"
             output_file = project_root / "jsontests" / "metagenerator_test_results.json"
             
             # Загружаем данные из lemmatizer_processor_results.json

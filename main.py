@@ -58,7 +58,7 @@ async def run_full_pipeline():
     data = await xmlriver_process_sheets_data(
         sheets_data=data,
         default_region=213,  # Регион по умолчанию, если не указан в данных URL
-        urls_per_query=10,  # Количество URL от каждого запроса
+        urls_per_query=5,  # Количество URL от каждого запроса
         device="mobile",  # desktop, tablet, mobile
         domain="ru",  # ru, com, ua...
         lang="ru",  # ru, uk, en...

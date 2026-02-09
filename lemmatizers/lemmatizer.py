@@ -212,7 +212,7 @@ if __name__ == "__main__":
     
     # Определяем пути относительно корня проекта
     project_root = Path(__file__).parent.parent
-    input_file = project_root / "jsontests" / "arsenkin_h_results.json"
+    input_file = project_root / "jsontests" / "step3_parsed_metatags.json"
     output_file = project_root / "jsontests" / "lemmatizer_results.json"
     
     # Читаем JSON файл
@@ -227,8 +227,11 @@ if __name__ == "__main__":
         for url, url_data in urls_dict.items():
             filtered_urls = url_data.get('filtered_urls', [])
             for item in filtered_urls:
-                if 'title' in item and item['title']:
-                    texts.append(item['title'])
+                # Проверяем, является ли item словарем с метаданными
+                if isinstance(item, dict) and 'meta' in item:
+                    meta = item['meta']
+                    if meta and 'title' in meta and meta['title']:
+                        texts.append(meta['title'])
     
     print(f"Найдено текстов: {len(texts)}")
     
